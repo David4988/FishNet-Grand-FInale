@@ -98,9 +98,7 @@ interface FishCatch {
   estimated_weight: number;
 }
 
-const dummyCatches: FishCatch[] = [
-  
-];
+const dummyCatches: FishCatch[] = [];
 
 const databaseService = {
   getCatchesBySpecies: async (species: string): Promise<FishCatch[]> => {
@@ -206,29 +204,47 @@ export default function HistoryPage() {
       const userCatches = await databaseService.getAllCatches();
 
       const publicFishImages = [
-        "/fish/sole.jpg","/fish/anchovy.jpg",
-        "/fish/snapper.jpg", "/fish/tuna.jpg", "/fish/mackerel.jpg","/fish/cod.jpg", "/fish/barracuda.jpg", "/fish/blackpomfret.jpg",
+        "/fish/sole.jpg",
+        "/fish/anchovy.jpg",
+        "/fish/snapper.jpg",
+        "/fish/tuna.jpg",
+        "/fish/mackerel.jpg",
+        "/fish/cod.jpg",
+        "/fish/barracuda.jpg",
+        "/fish/blackpomfret.jpg",
         "/fish/catfish.jpg",
-        "/fish/crab.jpg", "/fish/squid.jpg", 
+        "/fish/crab.jpg",
+        "/fish/squid.jpg",
       ];
 
       const filenameToSpecies = (path: string) => {
-        const name = path.split("/").pop()?.replace(/\.(jpg|jpeg|png|webp)$/i, "") ?? "";
-        return name.replace(/[_\-0-9]+/g, " ").replace(/\s+/g, " ").trim()
-          .split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        const name =
+          path
+            .split("/")
+            .pop()
+            ?.replace(/\.(jpg|jpeg|png|webp)$/i, "") ?? "";
+        return name
+          .replace(/[_\-0-9]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
       };
 
-      const sampleCatches = publicFishImages.map((img, idx): FishCatch => ({
-        id: `sample-${idx}`,
-        species: filenameToSpecies(img),
-        confidence: 90 + Math.floor(Math.random() * 10),
-        latitude: 20.5937 + (Math.random() - 0.5) * 10,
-        longitude: 78.9629 + (Math.random() - 0.5) * 10,
-        timestamp: new Date(Date.now() - idx * 3 * 86400000).toISOString(),
-        image_data: img,
-        health_score: 85 + Math.floor(Math.random() * 15),
-        estimated_weight: 1.2 + Math.random() * 2,
-      }));
+      const sampleCatches = publicFishImages.map(
+        (img, idx): FishCatch => ({
+          id: `sample-${idx}`,
+          species: filenameToSpecies(img),
+          confidence: 90 + Math.floor(Math.random() * 10),
+          latitude: 20.5937 + (Math.random() - 0.5) * 10,
+          longitude: 78.9629 + (Math.random() - 0.5) * 10,
+          timestamp: new Date(Date.now() - idx * 3 * 86400000).toISOString(),
+          image_data: img,
+          health_score: 85 + Math.floor(Math.random() * 15),
+          estimated_weight: 1.2 + Math.random() * 2,
+        })
+      );
 
       // Prepend local catches, then user catches, then samples
       setCatches([...localCatches, ...userCatches, ...sampleCatches]);
@@ -320,192 +336,278 @@ export default function HistoryPage() {
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-slate-900/80 backdrop-blur-2xl border border-sky-400/30 rounded-2xl shadow-2xl shadow-sky-400/10">
-          {selected && (() => {
-            // Type guard for local catch
-            function isLocalCatch(obj: any): obj is {
-              image: string;
-              createdAt: number;
-              healthScore?: number;
-              confidence?: number;
-              lat: number;
-              lng: number;
-            } {
-              return 'image' in obj && 'createdAt' in obj;
-            }
-            if (isLocalCatch(selected)) {
-              const image = selected.image;
-              const species = selected.species;
-              const confidence = selected.confidence ?? 0;
-              const health = selected.healthScore ?? 0;
-              const date = new Date(selected.createdAt).toLocaleString();
-              const lat = selected.lat;
-              const lng = selected.lng;
-              return (
-                <div className="p-6 overflow-y-auto max-h-[90vh] space-y-6">
-                  <DialogHeader>
-                    <DialogTitle>
-                      <div className="flex justify-between items-start">
-                        <span className="inline-flex items-center gap-3 text-2xl font-bold text-sky-400">
-                          {species}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelected(null)}
-                          className="text-gray-400 hover:text-white -mt-2 -mr-2"
-                        >
-                          <X />
-                        </Button>
-                      </div>
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex flex-col items-center gap-4">
-                      <img
-                        src={image}
-                        alt={species}
-                        className="rounded-xl shadow-lg w-full object-cover border-2 border-sky-400/20"
-                      />
-                      <div className="grid grid-cols-2 gap-2 w-full text-center">
-                        <div className="bg-sky-500/20 text-sky-300 px-3 py-2 rounded-lg text-sm font-semibold border border-sky-500/30">
-                          <p className="text-xs text-sky-400">Traceability</p>
-                          {confidence.toFixed(0)}%
-                        </div>
-                        <div className="bg-emerald-500/20 text-emerald-300 px-3 py-2 rounded-lg text-sm font-semibold border border-emerald-500/30">
-                          <p className="text-xs text-emerald-400">Health Score</p>
-                          {health.toFixed(0)}%
-                        </div>
-                      </div>
-                      <div className="bg-slate-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm font-medium w-full text-center border border-slate-700">
-                        <div>Date: {date}</div>
-                        <div>Lat: {lat}, Lng: {lng}</div>
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2 text-white">Analysis Details</h3>
-                      <div className="text-gray-300 text-sm">
-                        <div><strong>Species:</strong> {species}</div>
-                        <div><strong>Date:</strong> {date}</div>
-                        <div><strong>Lat/Lng:</strong> {lat}, {lng}</div>
-                        <div><strong>Traceability:</strong> {confidence.toFixed(0)}%</div>
-                        <div><strong>Health Score:</strong> {health.toFixed(0)}%</div>
-                        <div><strong>Image:</strong> <span className="break-all">{image}</span></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            } else {
-              // DB catch
-              const image = selected.image_data;
-              const species = selected.species;
-              const confidence = selected.confidence;
-              const health = selected.health_score;
-              const date = new Date(selected.timestamp).toLocaleString();
-              const lat = selected.latitude;
-              const lng = selected.longitude;
-              const weight = selected.estimated_weight;
-              return (
-                <div className="p-6 overflow-y-auto max-h-[90vh] space-y-6">
-                  <DialogHeader>
-                    <DialogTitle>
-                      <div className="flex justify-between items-start">
-                        <span className="inline-flex items-center gap-3 text-2xl font-bold text-sky-400">
-                          {species}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelected(null)}
-                          className="text-gray-400 hover:text-white -mt-2 -mr-2"
-                        >
-                          <X />
-                        </Button>
-                      </div>
-                    </DialogTitle>
-                  </DialogHeader>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="flex flex-col items-center gap-4">
-                      <img
-                        src={image}
-                        alt={species}
-                        className="rounded-xl shadow-lg w-full object-cover border-2 border-sky-400/20"
-                      />
-                      <div className="grid grid-cols-2 gap-2 w-full text-center">
-                        <div className="bg-sky-500/20 text-sky-300 px-3 py-2 rounded-lg text-sm font-semibold border border-sky-500/30">
-                          <p className="text-xs text-sky-400">Traceability</p>
-                          {confidence.toFixed(0)}%
-                        </div>
-                        <div className="bg-emerald-500/20 text-emerald-300 px-3 py-2 rounded-lg text-sm font-semibold border border-emerald-500/30">
-                          <p className="text-xs text-emerald-400">Health Score</p>
-                          {health.toFixed(0)}%
-                        </div>
-                      </div>
-                      <div className="bg-slate-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm font-medium w-full text-center border border-slate-700">
-                        Weight: {weight.toFixed(1)} kg
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2 text-white">Analysis Details</h3>
-                      <AnalysisResults result={selected} />
-                    </div>
-                  </div>
-
-                  {chartData.length > 1 && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2 text-white flex items-center gap-2">
-                        <BarChart size={18} className="text-sky-400" /> Recent Trends
-                      </h3>
-                      <div className="h-48 w-full -ml-4">
-                        <ChartContainer config={chartConfig} className="h-full w-full">
-                          <AreaChart
-                            data={chartData}
-                            margin={{ top: 10, right: 20, left: 10, bottom: 0 }}
+          {selected &&
+            (() => {
+              // Type guard for local catch
+              function isLocalCatch(obj: any): obj is {
+                image: string;
+                createdAt: number;
+                healthScore?: number;
+                confidence?: number;
+                lat: number;
+                lng: number;
+              } {
+                return "image" in obj && "createdAt" in obj;
+              }
+              if (isLocalCatch(selected)) {
+                const image = selected.image;
+                const species = selected.species;
+                const confidence = selected.confidence ?? 0;
+                const health = selected.healthScore ?? 0;
+                const date = new Date(selected.createdAt).toLocaleString();
+                const lat = selected.lat;
+                const lng = selected.lng;
+                return (
+                  <div
+                    className="p-6 overflow-y-auto max-h-[90vh] space-y-6"
+                    style={{
+                      WebkitOverflowScrolling: "touch",
+                      touchAction: "pan-y",
+                    }}
+                  >
+                    <DialogHeader>
+                      <DialogTitle>
+                        <div className="flex justify-between items-start">
+                          <span className="inline-flex items-center gap-3 text-2xl font-bold text-sky-400">
+                            {species}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelected(null)}
+                            className="text-gray-400 hover:text-white -mt-2 -mr-2"
                           >
-                            <defs>
-                              <linearGradient id="fillTraceability" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={chartConfig.Traceability.color} stopOpacity={0.8} />
-                                <stop offset="95%" stopColor={chartConfig.Traceability.color} stopOpacity={0.1} />
-                              </linearGradient>
-                              <linearGradient id="fillHealth" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={chartConfig.Health.color} stopOpacity={0.8} />
-                                <stop offset="95%" stopColor={chartConfig.Health.color} stopOpacity={0.1} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid vertical={false} stroke="rgba(14, 165, 233, 0.15)" strokeDasharray="3 3" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} />
-                            <YAxis domain={[50, 100]} axisLine={false} tickLine={false} />
-                            <ChartTooltip
-                              cursor={{ stroke: "hsl(195, 89%, 52%)", strokeWidth: 1, fill: "transparent" }}
-                              content={<ChartTooltipContent indicator="line" />}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="Traceability"
-                              strokeWidth={2}
-                              stroke={chartConfig.Traceability.color}
-                              fill="url(#fillTraceability)"
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="Health"
-                              strokeWidth={2}
-                              stroke={chartConfig.Health.color}
-                              fill="url(#fillHealth)"
-                            />
-                          </AreaChart>
-                        </ChartContainer>
+                            <X />
+                          </Button>
+                        </div>
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex flex-col items-center gap-4">
+                        <img
+                          src={image}
+                          alt={species}
+                          className="rounded-xl shadow-lg w-full object-cover border-2 border-sky-400/20"
+                        />
+                        <div className="grid grid-cols-2 gap-2 w-full text-center">
+                          <div className="bg-sky-500/20 text-sky-300 px-3 py-2 rounded-lg text-sm font-semibold border border-sky-500/30">
+                            <p className="text-xs text-sky-400">Traceability</p>
+                            {confidence.toFixed(0)}%
+                          </div>
+                          <div className="bg-emerald-500/20 text-emerald-300 px-3 py-2 rounded-lg text-sm font-semibold border border-emerald-500/30">
+                            <p className="text-xs text-emerald-400">
+                              Health Score
+                            </p>
+                            {health.toFixed(0)}%
+                          </div>
+                        </div>
+                        <div className="bg-slate-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm font-medium w-full text-center border border-slate-700">
+                          <div>Date: {date}</div>
+                          <div>
+                            Lat: {lat}, Lng: {lng}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2 text-white">
+                          Analysis Details
+                        </h3>
+                        <div className="text-gray-300 text-sm">
+                          <div>
+                            <strong>Species:</strong> {species}
+                          </div>
+                          <div>
+                            <strong>Date:</strong> {date}
+                          </div>
+                          <div>
+                            <strong>Lat/Lng:</strong> {lat}, {lng}
+                          </div>
+                          <div>
+                            <strong>Traceability:</strong>{" "}
+                            {confidence.toFixed(0)}%
+                          </div>
+                          <div>
+                            <strong>Health Score:</strong> {health.toFixed(0)}%
+                          </div>
+                          <div>
+                            <strong>Image:</strong>{" "}
+                            <span className="break-all">{image}</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            }
-          })()}
+                  </div>
+                );
+              } else {
+                // DB catch
+                const image = selected.image_data;
+                const species = selected.species;
+                const confidence = selected.confidence;
+                const health = selected.health_score;
+                const date = new Date(selected.timestamp).toLocaleString();
+                const lat = selected.latitude;
+                const lng = selected.longitude;
+                const weight = selected.estimated_weight;
+                return (
+                  <div className="p-6 overflow-y-auto max-h-[90vh] space-y-6">
+                    <DialogHeader>
+                      <DialogTitle>
+                        <div className="flex justify-between items-start">
+                          <span className="inline-flex items-center gap-3 text-2xl font-bold text-sky-400">
+                            {species}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelected(null)}
+                            className="text-gray-400 hover:text-white -mt-2 -mr-2"
+                          >
+                            <X />
+                          </Button>
+                        </div>
+                      </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="flex flex-col items-center gap-4">
+                        <img
+                          src={image}
+                          alt={species}
+                          className="rounded-xl shadow-lg w-full object-cover border-2 border-sky-400/20"
+                        />
+                        <div className="grid grid-cols-2 gap-2 w-full text-center">
+                          <div className="bg-sky-500/20 text-sky-300 px-3 py-2 rounded-lg text-sm font-semibold border border-sky-500/30">
+                            <p className="text-xs text-sky-400">Traceability</p>
+                            {confidence.toFixed(0)}%
+                          </div>
+                          <div className="bg-emerald-500/20 text-emerald-300 px-3 py-2 rounded-lg text-sm font-semibold border border-emerald-500/30">
+                            <p className="text-xs text-emerald-400">
+                              Health Score
+                            </p>
+                            {health.toFixed(0)}%
+                          </div>
+                        </div>
+                        <div className="bg-slate-800/50 text-gray-300 px-3 py-2 rounded-lg text-sm font-medium w-full text-center border border-slate-700">
+                          Weight: {weight.toFixed(1)} kg
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2 text-white">
+                          Analysis Details
+                        </h3>
+                        <AnalysisResults result={selected} />
+                      </div>
+                    </div>
+
+                    {chartData.length > 1 && (
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2 text-white flex items-center gap-2">
+                          <BarChart size={18} className="text-sky-400" /> Recent
+                          Trends
+                        </h3>
+                        <div className="h-48 w-full -ml-4">
+                          <ChartContainer
+                            config={chartConfig}
+                            className="h-full w-full"
+                          >
+                            <AreaChart
+                              data={chartData}
+                              margin={{
+                                top: 10,
+                                right: 20,
+                                left: 10,
+                                bottom: 0,
+                              }}
+                            >
+                              <defs>
+                                <linearGradient
+                                  id="fillTraceability"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="5%"
+                                    stopColor={chartConfig.Traceability.color}
+                                    stopOpacity={0.8}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor={chartConfig.Traceability.color}
+                                    stopOpacity={0.1}
+                                  />
+                                </linearGradient>
+                                <linearGradient
+                                  id="fillHealth"
+                                  x1="0"
+                                  y1="0"
+                                  x2="0"
+                                  y2="1"
+                                >
+                                  <stop
+                                    offset="5%"
+                                    stopColor={chartConfig.Health.color}
+                                    stopOpacity={0.8}
+                                  />
+                                  <stop
+                                    offset="95%"
+                                    stopColor={chartConfig.Health.color}
+                                    stopOpacity={0.1}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid
+                                vertical={false}
+                                stroke="rgba(14, 165, 233, 0.15)"
+                                strokeDasharray="3 3"
+                              />
+                              <XAxis
+                                dataKey="label"
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <YAxis
+                                domain={[50, 100]}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <ChartTooltip
+                                cursor={{
+                                  stroke: "hsl(195, 89%, 52%)",
+                                  strokeWidth: 1,
+                                  fill: "transparent",
+                                }}
+                                content={
+                                  <ChartTooltipContent indicator="line" />
+                                }
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="Traceability"
+                                strokeWidth={2}
+                                stroke={chartConfig.Traceability.color}
+                                fill="url(#fillTraceability)"
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="Health"
+                                strokeWidth={2}
+                                stroke={chartConfig.Health.color}
+                                fill="url(#fillHealth)"
+                              />
+                            </AreaChart>
+                          </ChartContainer>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            })()}
         </DialogContent>
       </Dialog>
     </div>
   );
-} 
+}

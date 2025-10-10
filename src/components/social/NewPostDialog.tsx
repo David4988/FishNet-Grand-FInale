@@ -1,58 +1,112 @@
-import { useState } from 'react';
-import { Plus, Upload, X, Fish, MapPin } from 'lucide-react';
+import { useState } from "react";
+import { Plus, Upload, X, Fish, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { socialService } from '@/services/social';
-import { authService } from '@/services/auth';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { socialService } from "@/services/social";
+import { authService } from "@/services/auth";
+import { cn } from "@/lib/utils";
 
 interface NewPostDialogProps {
   trigger?: React.ReactNode;
   onPostCreated?: () => void;
 }
 
-export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) => {
+export const NewPostDialog = ({
+  trigger,
+  onPostCreated,
+}: NewPostDialogProps) => {
   const [open, setOpen] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string>('');
-  const [fileType, setFileType] = useState<'image' | 'video' | null>(null);
-  const [caption, setCaption] = useState('');
-  const [species, setSpecies] = useState('');
-  const [weight, setWeight] = useState('');
-  const [location, setLocation] = useState('');
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [fileType, setFileType] = useState<"image" | "video" | null>(null);
+  const [caption, setCaption] = useState("");
+  const [species, setSpecies] = useState("");
+  const [weight, setWeight] = useState("");
+  const [location, setLocation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const fishSpecies = [
-    'Pomfret', 'Kingfish', 'Tuna', 'Sardine', 'Mackerel', 'Snapper', 'Grouper',
-    'Prawn', 'Sole Fish', 'Anchovy', 'Indian Salmon', 'Ghol Fish',
-    'Ribbon Fish', 'Croaker', 'Black Pomfret', 'Threadfin Bream', 'Mullet',
-    'Seer Fish', 'Barracuda', 'Catfish', 'Hilsa', 'Pearl Spot', 'Lobster',
-    'Squid', 'Crab', 'Red Snapper', 'Octopus', 'Sea Bass', 'Mahi Mahi', 'Stingray'
+    "Pomfret",
+    "Kingfish",
+    "Tuna",
+    "Sardine",
+    "Mackerel",
+    "Snapper",
+    "Grouper",
+    "Prawn",
+    "Sole Fish",
+    "Anchovy",
+    "Indian Salmon",
+    "Ghol Fish",
+    "Ribbon Fish",
+    "Croaker",
+    "Black Pomfret",
+    "Threadfin Bream",
+    "Mullet",
+    "Seer Fish",
+    "Barracuda",
+    "Catfish",
+    "Hilsa",
+    "Pearl Spot",
+    "Lobster",
+    "Squid",
+    "Crab",
+    "Red Snapper",
+    "Octopus",
+    "Sea Bass",
+    "Mahi Mahi",
+    "Stingray",
   ];
 
   const indianLocations = [
-    'Palolem Beach, Goa', 'Fort Kochi Beach, Kerala', 'Pondicherry Beach', 
-    'RK Beach, Visakhapatnam', 'Ganpatipule Beach, Maharashtra', 'Kanyakumari Beach',
-    'Panambur Beach, Mangalore', 'Puri Beach, Odisha', 'Karwar Beach, Karnataka',
-    'Tuticorin Beach, Tamil Nadu', 'Juhu Beach, Mumbai', 'Diu Beach',
-    'Daman Beach', 'Kakinada Beach, Andhra Pradesh', 'Ratnagiri Beach, Maharashtra',
-    'Kozhikode Beach, Kerala', 'Malpe Beach, Karnataka', 'Mandvi Beach, Gujarat',
-    'Marina Beach, Chennai', 'Baga Beach, Goa', 'Alibaug Beach, Maharashtra',
-    'Digha Beach, West Bengal', 'Varkala Beach, Kerala', 'Kovalam Beach, Kerala',
-    'Mahabalipuram Beach, Tamil Nadu', 'Calangute Beach, Goa', 'Bekal Beach, Kerala',
-    'Anjuna Beach, Goa', 'Shankarpur Beach, West Bengal', 'Marve Beach, Mumbai',
-    'Karaikal Beach, Puducherry'
+    "Palolem Beach, Goa",
+    "Fort Kochi Beach, Kerala",
+    "Pondicherry Beach",
+    "RK Beach, Visakhapatnam",
+    "Ganpatipule Beach, Maharashtra",
+    "Kanyakumari Beach",
+    "Panambur Beach, Mangalore",
+    "Puri Beach, Odisha",
+    "Karwar Beach, Karnataka",
+    "Tuticorin Beach, Tamil Nadu",
+    "Juhu Beach, Mumbai",
+    "Diu Beach",
+    "Daman Beach",
+    "Kakinada Beach, Andhra Pradesh",
+    "Ratnagiri Beach, Maharashtra",
+    "Kozhikode Beach, Kerala",
+    "Malpe Beach, Karnataka",
+    "Mandvi Beach, Gujarat",
+    "Marina Beach, Chennai",
+    "Baga Beach, Goa",
+    "Alibaug Beach, Maharashtra",
+    "Digha Beach, West Bengal",
+    "Varkala Beach, Kerala",
+    "Kovalam Beach, Kerala",
+    "Mahabalipuram Beach, Tamil Nadu",
+    "Calangute Beach, Goa",
+    "Bekal Beach, Kerala",
+    "Anjuna Beach, Goa",
+    "Shankarpur Beach, West Bengal",
+    "Marve Beach, Mumbai",
+    "Karaikal Beach, Puducherry",
   ];
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,15 +114,15 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: 'File too large',
-          description: 'Please select a file under 10MB',
-          variant: 'destructive',
+          title: "File too large",
+          description: "Please select a file under 10MB",
+          variant: "destructive",
         });
         return;
       }
 
-      const isVideo = file.type.startsWith('video/');
-      setFileType(isVideo ? 'video' : 'image');
+      const isVideo = file.type.startsWith("video/");
+      setFileType(isVideo ? "video" : "image");
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -82,18 +136,18 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
     const currentUser = authService.getState().user;
     if (!currentUser) {
       toast({
-        title: 'Error',
-        description: 'You must be logged in to create a post',
-        variant: 'destructive',
+        title: "Error",
+        description: "You must be logged in to create a post",
+        variant: "destructive",
       });
       return;
     }
 
     if (!imagePreview || !species) {
       toast({
-        title: 'Missing information',
-        description: 'Please select an image and species',
-        variant: 'destructive',
+        title: "Missing information",
+        description: "Please select an image and species",
+        variant: "destructive",
       });
       return;
     }
@@ -112,36 +166,38 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
         healthScore: Math.floor(Math.random() * 20) + 80, // Random health score between 80-100
         estimatedWeight: parseFloat(weight) || Math.random() * 5 + 1,
         estimatedCount: 1,
-        location: location ? {
-          name: location,
-          latitude: 0,
-          longitude: 0
-        } : undefined,
+        location: location
+          ? {
+              name: location,
+              latitude: 0,
+              longitude: 0,
+            }
+          : undefined,
         timestamp: new Date().toISOString(),
-        isOffline: !navigator.onLine
+        isOffline: !navigator.onLine,
       });
 
       toast({
-        title: 'Post created!',
-        description: 'Your catch has been shared with the community',
+        title: "Post created!",
+        description: "Your catch has been shared with the community",
       });
 
       // Reset form
-      setImagePreview('');
+      setImagePreview("");
       setFileType(null);
-      setCaption('');
-      setSpecies('');
-      setWeight('');
-      setLocation('');
+      setCaption("");
+      setSpecies("");
+      setWeight("");
+      setLocation("");
       setOpen(false);
 
       // Notify parent component
       onPostCreated?.();
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to create post',
-        variant: 'destructive',
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -152,7 +208,7 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button 
+          <Button
             size="sm"
             className="bg-gradient-primary hover:opacity-90 text-white shadow-glow"
             data-testid="button-new-post-trigger"
@@ -162,7 +218,10 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Fish className="h-5 w-5 text-primary" />
@@ -177,7 +236,9 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
             <div
               className={cn(
                 "relative border-2 border-dashed rounded-lg transition-colors",
-                imagePreview ? "border-primary" : "border-border hover:border-primary"
+                imagePreview
+                  ? "border-primary"
+                  : "border-border hover:border-primary"
               )}
             >
               <input
@@ -194,7 +255,7 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
               >
                 {imagePreview ? (
                   <div className="relative w-full">
-                    {fileType === 'video' ? (
+                    {fileType === "video" ? (
                       <video
                         src={imagePreview}
                         controls
@@ -213,7 +274,7 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
                       className="absolute top-2 right-2"
                       onClick={(e) => {
                         e.preventDefault();
-                        setImagePreview('');
+                        setImagePreview("");
                         setFileType(null);
                       }}
                       data-testid="button-remove-image"
@@ -225,7 +286,8 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
                   <>
                     <Upload className="h-10 w-10 text-muted-foreground mb-2" />
                     <p className="text-sm text-muted-foreground text-center">
-                      Click to upload image or video<br />
+                      Click to upload image or video
+                      <br />
                       <span className="text-xs">Max file size: 10MB</span>
                     </p>
                   </>
@@ -305,7 +367,7 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
             className="w-full bg-gradient-primary hover:opacity-90 text-white"
             data-testid="button-create-post"
           >
-            {isSubmitting ? 'Creating...' : 'Share Post'}
+            {isSubmitting ? "Creating..." : "Share Post"}
           </Button>
         </div>
       </DialogContent>

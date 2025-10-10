@@ -325,7 +325,10 @@ export default function HistoryPage() {
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl w-[90vw] max-h-[90vh] p-0 overflow-hidden bg-slate-900/80 backdrop-blur-2xl border border-sky-400/30 rounded-2xl shadow-2xl shadow-sky-400/10">
           {selected && (
-            <div className="p-6 overflow-y-auto max-h-[90vh] space-y-6">
+            <div
+              className="p-6 overflow-y-auto max-h-[90vh] space-y-6"
+              style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y" }}
+            >
               <DialogHeader>
                 <DialogTitle>
                   <div className="flex justify-between items-start">
