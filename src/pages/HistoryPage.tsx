@@ -206,10 +206,10 @@ export default function HistoryPage() {
       const userCatches = await databaseService.getAllCatches();
 
       const publicFishImages = [
-        "/fish/cod.jpg", "/fish/barracuda.jpg", "/fish/blackpomfret.jpg",
-        "/fish/catfish.jpg", "/fish/bombayduck.jpg",
-        "/fish/crab.jpg", "/fish/squid.jpg", "/fish/sole.jpg","/fish/anchovy.jpg",
-        "/fish/snapper.jpg", "/fish/tuna.jpg", "/fish/mackerel.jpg",
+        "/fish/sole.jpg","/fish/anchovy.jpg",
+        "/fish/snapper.jpg", "/fish/tuna.jpg", "/fish/mackerel.jpg","/fish/cod.jpg", "/fish/barracuda.jpg", "/fish/blackpomfret.jpg",
+        "/fish/catfish.jpg",
+        "/fish/crab.jpg", "/fish/squid.jpg", 
       ];
 
       const filenameToSpecies = (path: string) => {

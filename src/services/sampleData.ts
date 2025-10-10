@@ -124,18 +124,6 @@ export const sampleIndiaFishCatches = [
     is_synced: false
   },
   {
-    species: 'Bombay Duck',
-    confidence: 87.2,
-    health_score: 86.4,
-    count: 4,
-    estimated_weight: 0.6,
-    timestamp: new Date(Date.now() - 11 * 24 * 60 * 60 * 1000).toISOString(),
-    latitude: 19.2183, // Juhu Beach, Mumbai
-    longitude: 72.8263,
-    image_data: '/fish_images/bombay_duck_fish_fre_f4690b3a.jpg',
-    is_synced: false
-  },
-  {
     species: 'Indian Salmon',
     confidence: 90.7,
     health_score: 93.2,

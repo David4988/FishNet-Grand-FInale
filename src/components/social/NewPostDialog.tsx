@@ -35,7 +35,7 @@ export const NewPostDialog = ({ trigger, onPostCreated }: NewPostDialogProps) =>
 
   const fishSpecies = [
     'Pomfret', 'Kingfish', 'Tuna', 'Sardine', 'Mackerel', 'Snapper', 'Grouper',
-    'Prawn', 'Sole Fish', 'Anchovy', 'Bombay Duck', 'Indian Salmon', 'Ghol Fish',
+    'Prawn', 'Sole Fish', 'Anchovy', 'Indian Salmon', 'Ghol Fish',
     'Ribbon Fish', 'Croaker', 'Black Pomfret', 'Threadfin Bream', 'Mullet',
     'Seer Fish', 'Barracuda', 'Catfish', 'Hilsa', 'Pearl Spot', 'Lobster',
     'Squid', 'Crab', 'Red Snapper', 'Octopus', 'Sea Bass', 'Mahi Mahi', 'Stingray'
