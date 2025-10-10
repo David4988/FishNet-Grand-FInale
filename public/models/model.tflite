@@ -1,0 +1,13 @@
+# Placeholder TensorFlow Lite Model File
+# This is a placeholder file for the fish species identification model
+# In a real implementation, this would be a binary .tflite model file
+# The actual model would be trained on fish species data and converted to TensorFlow Lite format
+
+# For this demo, the app will use a fallback prediction system
+# The TensorFlow service will handle the missing model gracefully
+
+# Model specs (when available):
+# - Input: 224x224x3 RGB image
+# - Output: 30 fish species classifications
+# - Model size: ~10-15 MB
+# - Inference time: ~100-300ms on mobile devices

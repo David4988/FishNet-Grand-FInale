@@ -1,0 +1,40 @@
+{
+  "labels": [
+    "Salmon (Atlantic)",
+    "Tuna (Bluefin)", 
+    "Bass (Largemouth)",
+    "Trout (Rainbow)",
+    "Cod (Atlantic)",
+    "Snapper (Red)",
+    "Mackerel (Spanish)",
+    "Grouper (Goliath)",
+    "Flounder (Summer)",
+    "Catfish (Channel)",
+    "Pike (Northern)",
+    "Perch (Yellow)",
+    "Walleye",
+    "Carp (Common)",
+    "Shark (Blacktip)",
+    "Mahi Mahi",
+    "Barracuda (Great)",
+    "Pompano (Florida)",
+    "Kingfish (King Mackerel)",
+    "Amberjack (Greater)",
+    "Snook (Common)",
+    "Tarpon (Atlantic)",
+    "Redfish (Red Drum)",
+    "Swordfish",
+    "Marlin (Blue)",
+    "Yellowtail (California)",
+    "Halibut (Pacific)",
+    "Rockfish (Striped)",
+    "Lingcod",
+    "Sheepshead"
+  ],
+  "info": {
+    "model_version": "1.0",
+    "training_date": "2024-01-15",
+    "accuracy": 0.89,
+    "description": "Fish species classification model trained on diverse marine and freshwater species"
+  }
+}
