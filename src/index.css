@@ -155,7 +155,6 @@
     /* Prevent pull-to-refresh on mobile */
     overscroll-behavior: none;
     /* Full viewport handling */
-    min-height: 100vh;
     min-height: 100dvh; /* Dynamic viewport height */
   }
 

@@ -232,7 +232,7 @@ export default function AnalyzePage() {
         <div className="text-center py-8 relative">
           <div className="absolute inset-0 bg-gradient-glow opacity-30 blur-3xl"></div>
           <div className="relative">
-            <h1 className="text-3xl font-bold text-gradient mb-3 sm:animate-fade-in">
+            <h1 className="text-3xl font-bold text-gradient mb-3">
               🐟 AI Fish Scanner
             </h1>
             <p className="text-muted-foreground text-lg sm:animate-slide-up">
