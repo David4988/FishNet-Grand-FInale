@@ -238,7 +238,7 @@ export default function AnalyzePage() {
             <p className="text-muted-foreground text-lg sm:animate-slide-up">
               Professional species identification powered by advanced AI models
             </p>
-            <div className="mt-4 flex justify-center items-center gap-2 text-sm text-muted-foreground sm:animate-scale-in">
+            <div className="mt-4 flex justify-center items-center gap-2 text-sm text-muted-foreground ">
               <div className="w-2 h-2 bg-success rounded-full animate-pulse-glow"></div>
               <span>Real-time AI analysis • 50+ species</span>
             </div>

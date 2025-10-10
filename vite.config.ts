@@ -7,13 +7,13 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "0.0.0.0",                    // lets other devices connect
-    port: 5700,
-    strictPort: true,
+    port: 5000,
+    // strictPort: true,
     allowedHosts: ["*"],
-    https: {                           // 👈 add this block
-      key: fs.readFileSync("./192.168.0.5-key.pem"),
-      cert: fs.readFileSync("./192.168.0.5.pem")
-    }
+    // https: {                           // 👈 add this block
+    //   key: fs.readFileSync("./192.168.0.5-key.pem"),
+    //   cert: fs.readFileSync("./192.168.0.5.pem")
+    // }
     // no need for the old HMR section unless you really want Replit hot reload
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
