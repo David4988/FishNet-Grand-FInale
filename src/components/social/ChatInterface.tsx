@@ -117,7 +117,7 @@ export const ChatInterface = () => {
   // Mobile view: show either conversation list or selected chat
   if (isMobileView && selectedConversation) {
     return (
-      <div className="h-[calc(100vh-180px)] flex flex-col bg-background">
+      <div className="h-[calc(100dvh-180px)] flex flex-col bg-background">
         {/* Chat Header */}
         <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
           <Button
@@ -209,7 +209,7 @@ export const ChatInterface = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-180px)] flex bg-background">
+    <div className="h-[calc(100dvh-180px)] flex bg-background">
       {/* Conversations List */}
       <div className={cn(
         "border-r border-border bg-card",

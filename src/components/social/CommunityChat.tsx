@@ -172,7 +172,7 @@ export const CommunityChat = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-220px)]">
+    <div className="flex flex-col h-[calc(100dvh-220px)]">
       <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
         <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
           <Fish className="h-6 w-6 text-white" />
