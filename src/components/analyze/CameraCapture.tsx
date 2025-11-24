@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
-import { Camera, Upload, X, Check } from "lucide-react";
+import { Camera, Upload, X, Check, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface CameraCaptureProps {
   onImageCapture: (imageData: string, file?: File) => void;
@@ -11,6 +11,7 @@ interface CameraCaptureProps {
 }
 
 export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCaptureProps) => {
+  const { t } = useTranslation();
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +35,6 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
       }
     } catch (error) {
       console.error('Error accessing camera:', error);
-      // Fallback to file input if camera fails
       fileInputRef.current?.click();
     } finally {
       setIsLoading(false);
@@ -55,7 +55,6 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
         const imageData = canvas.toDataURL('image/jpeg', 0.9);
         setCapturedImage(imageData);
         
-        // Stop camera stream
         const stream = video.srcObject as MediaStream;
         stream?.getTracks().forEach(track => track.stop());
       }
@@ -68,8 +67,7 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
       setIsLoading(true);
       const reader = new FileReader();
       reader.onload = async (e) => {
-        // Add 1.5 second loading state for better UX when uploading from device
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 500));
         const imageData = e.target?.result as string;
         setCapturedImage(imageData);
         setIsLoading(false);
@@ -91,7 +89,7 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
   };
 
   return (
-    <div className={cn("relative w-full h-full", className)}>
+    <div className={cn("relative w-full h-full bg-black flex flex-col", className)}>
       <input
         ref={fileInputRef}
         type="file"
@@ -104,7 +102,8 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
       <canvas ref={canvasRef} className="hidden" />
 
       {!capturedImage ? (
-        <div className="relative w-full h-full bg-black rounded-lg overflow-hidden">
+        // --- LIVE CAMERA MODE ---
+        <div className="relative flex-1 overflow-hidden">
           <video
             ref={videoRef}
             autoPlay
@@ -113,79 +112,77 @@ export const CameraCapture = ({ onImageCapture, onClose, className }: CameraCapt
             className="w-full h-full object-cover"
           />
           
-          {/* Camera overlay */}
-          <div className="absolute inset-0 flex flex-col justify-between p-6">
+          {/* Camera UI Overlay */}
+          <div className="absolute inset-0 flex flex-col justify-between p-6 z-10">
             <div className="flex justify-between items-start">
               {onClose && (
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="icon"
                   onClick={onClose}
-                  className="bg-black/50 hover:bg-black/70 text-white border-none"
+                  className="bg-black/40 text-white hover:bg-black/60 rounded-full backdrop-blur-md"
                 >
-                  <X size={20} />
+                  <X size={24} />
                 </Button>
               )}
             </div>
 
-            {/* Camera controls */}
-            <div className="flex justify-center items-center gap-4">
+            {/* Controls */}
+            <div className="flex justify-around items-center pb-8">
               <Button
-                variant="secondary"
+                variant="ghost"
+                size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-black/50 hover:bg-black/70 text-white border-none"
+                className="text-white/80 hover:text-white hover:bg-white/10 rounded-full w-12 h-12"
               >
-                <Upload size={20} className="mr-2" />
-                Gallery
+                <ImageIcon size={28} />
               </Button>
 
               <Button
                 onClick={videoRef.current ? capturePhoto : startCamera}
                 disabled={isLoading}
-                className="w-16 h-16 rounded-full bg-primary hover:bg-primary-glow shadow-glow"
+                className="w-20 h-20 rounded-full bg-white border-4 border-white/30 shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:scale-105 transition-transform flex items-center justify-center p-0"
               >
-                <Camera size={24} />
+                {isLoading ? <div className="w-8 h-8 border-4 border-slate-300 border-t-transparent rounded-full animate-spin" /> : <div className="w-16 h-16 rounded-full bg-white border-2 border-slate-300" />}
               </Button>
-            </div>
-          </div>
 
-          {/* Viewfinder overlay */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute inset-6 border-2 border-primary/50 rounded-lg">
-              <div className="absolute top-0 left-0 w-8 h-8 border-l-4 border-t-4 border-primary rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-r-4 border-t-4 border-primary rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-l-4 border-b-4 border-primary rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-r-4 border-b-4 border-primary rounded-br-lg" />
+              <div className="w-12 h-12" />
             </div>
           </div>
         </div>
       ) : (
-        <Card className="relative w-full h-full bg-black overflow-hidden">
-          <img
-            src={capturedImage}
-            alt="Captured fish"
-            className="w-full h-full object-cover"
-          />
-          
-          <div className="absolute bottom-6 inset-x-6 flex justify-center gap-4">
+        // --- PREVIEW MODE (Fixed) ---
+        <div className="relative flex-1 bg-slate-950 flex flex-col">
+          {/* Image Area - Maximized */}
+          <div className="relative flex-1 overflow-hidden">
+             <img
+                src={capturedImage}
+                alt="Preview"
+                className="w-full h-full object-contain bg-black"
+             />
+             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
+          </div>
+
+          {/* Control Bar */}
+          <div className="bg-slate-950 p-6 pt-0 flex gap-4 items-center justify-center z-20">
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={retakePhoto}
-              className="bg-black/50 hover:bg-black/70 text-white border-none"
+              className="flex-1 h-14 rounded-2xl border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white backdrop-blur-md font-medium text-base"
             >
-              <X size={20} className="mr-2" />
-              Retake
+              <RefreshCw size={18} className="mr-2" />
+              {t('analyze.retake')}
             </Button>
             
             <Button
               onClick={confirmImage}
-              className="bg-primary hover:bg-primary-glow shadow-glow"
+              className="flex-[2] h-14 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-lg shadow-lg shadow-cyan-500/20"
             >
               <Check size={20} className="mr-2" />
-              Analyze Fish
+              {t('analyze.analyzeFish')}
             </Button>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

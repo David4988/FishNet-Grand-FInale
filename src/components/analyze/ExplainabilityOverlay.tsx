@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
-import { Eye, EyeOff, Zap } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { BoundingBox } from "@/types/fishnet";
+import { useTranslation } from "react-i18next";
 
 interface ExplainabilityOverlayProps {
   imageData: string;
   species: string;
   confidence: number;
+  boundingBox?: BoundingBox;
   className?: string;
 }
 
@@ -16,123 +17,111 @@ export const ExplainabilityOverlay = ({
   imageData, 
   species, 
   confidence, 
+  boundingBox,
   className 
 }: ExplainabilityOverlayProps) => {
+  const { t } = useTranslation();
   const [showOverlay, setShowOverlay] = useState(true);
-  const [boundingBox, setBoundingBox] = useState({
-    x: 15,
-    y: 20,
-    width: 70,
-    height: 60
-  });
 
-  useEffect(() => {
-    // Simulate AI processing and bounding box detection
-    const timer = setTimeout(() => {
-      // Generate a realistic bounding box based on confidence
-      const centerX = 30 + Math.random() * 40; // 30-70%
-      const centerY = 25 + Math.random() * 50; // 25-75%
-      const size = Math.max(40, confidence * 0.8); // Larger box for higher confidence
-      
-      setBoundingBox({
-        x: centerX - size/2,
-        y: centerY - size/2,
-        width: size,
-        height: size * 0.75
-      });
-    }, 500);
+  // Default center box if missing
+  const box = boundingBox || { yMin: 0.15, xMin: 0.15, yMax: 0.85, xMax: 0.85 };
 
-    return () => clearTimeout(timer);
-  }, [confidence]);
+  // � SMART POSITIONING LOGIC: If the box is too high, move the label to the bottom/right.
+  const isNearTop = box.yMin < 0.15;
+
+  const style = {
+    top: `${box.yMin * 100}%`,
+    left: `${box.xMin * 100}%`,
+    width: `${(box.xMax - box.xMin) * 100}%`,
+    height: `${(box.yMax - box.yMin) * 100}%`,
+  };
 
   return (
-    <div className={cn("relative", className)}>
-      <div className="relative overflow-hidden rounded-lg">
+    <div className={cn("relative w-full overflow-hidden bg-slate-950 shadow-2xl", className)}>
+      {/* Main Image */}
+      <div className="relative w-full h-full">
         <img
           src={imageData}
           alt="Fish analysis"
-          className="w-full h-64 object-cover"
+          className="w-full h-full object-cover" 
         />
         
-        {/* Explainability Overlay */}
+        {/* Grid Texture Overlay */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+        
+        {/* �️ TECH OVERLAY */}
         {showOverlay && (
           <div className="absolute inset-0">
-            {/* Semi-transparent overlay */}
-            <div className="absolute inset-0 bg-black/20" />
+            {/* Cinematic Vignette (Darken edges) */}
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-slate-950/60" />
             
-            {/* Bounding Box */}
+            {/* THE TARGET BOX */}
             <div 
-              className="absolute border-2 border-primary bg-primary/10 rounded-lg transition-all duration-500"
-              style={{
-                left: `${boundingBox.x}%`,
-                top: `${boundingBox.y}%`,
-                width: `${boundingBox.width}%`,
-                height: `${boundingBox.height}%`,
-              }}
+              className="absolute border-2 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.4)] transition-all duration-700 ease-out"
+              style={style}
             >
-              {/* Corner markers */}
-              <div className="absolute -top-1 -left-1 w-3 h-3 bg-primary rounded-full" />
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full" />
-              <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-primary rounded-full" />
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-primary rounded-full" />
+              {/* Scanline Animation */}
+              <div className="absolute inset-0 overflow-hidden opacity-30">
+                <div className="w-full h-full bg-gradient-to-b from-transparent via-cyan-400/20 to-transparent animate-scanline" />
+              </div>
+
+              {/* Tech Corners */}
+              <div className="absolute -top-1 -left-1 w-4 h-4 border-l-2 border-t-2 border-cyan-400" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 border-r-2 border-t-2 border-cyan-400" />
+              <div className="absolute -bottom-1 -left-1 w-4 h-4 border-l-2 border-b-2 border-cyan-400" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 border-r-2 border-b-2 border-cyan-400" />
               
-              {/* Label */}
-              <div className="absolute -top-8 left-0 bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium whitespace-nowrap">
-                <div className="flex items-center gap-1">
-                  <Zap className="w-3 h-3" />
-                  Pattern Matched
+              {/* �️ SMART FLOATING LABEL (Anti-Collision Logic) */}
+              <div 
+                className={cn(
+                  "absolute flex flex-col transition-all duration-300",
+                  // �️ The Fix: Avoid Top-Left (Back Button) if Near Top
+                  isNearTop ? "top-2 right-2 items-end" : "-top-14 left-0 items-start" 
+                )}
+              >
+                {/* "Target Locked" Badge */}
+                <div className={cn(
+                  "flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-cyan-500/30 px-3 py-1.5 shadow-lg",
+                  isNearTop ? "rounded-b-lg rounded-tl-lg" : "rounded-t-lg"
+                )}>
+                   <Target className="w-3 h-3 text-cyan-400 animate-pulse" />
+                   <span className="text-[10px] font-mono font-bold text-cyan-100 tracking-wider uppercase">
+                      {t('analyze.targetLocked')}
+                   </span>
+                </div>
+                
+                {/* Species Name Badge */}
+                <div className={cn(
+                  "bg-cyan-500 text-slate-950 px-3 py-1.5 text-sm font-bold shadow-lg",
+                  // If near top, place this label below the badge
+                  isNearTop ? "rounded-bl-lg rounded-tl-lg order-first mb-1" : "rounded-b-lg rounded-tr-lg"
+                )}>
+                   {species} 
+                   <span className="ml-2 opacity-80 text-xs font-mono">
+                     {confidence.toFixed(1)}%
+                   </span>
                 </div>
               </div>
             </div>
-            
-            {/* AI Analysis Info */}
-            <Card className="absolute bottom-4 left-4 right-4 bg-card/90 backdrop-blur-sm border-primary/20">
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="bg-primary/20 text-primary">
-                      AI Detection
-                    </Badge>
-                    <span className="text-sm font-medium">{species}</span>
-                  </div>
-                  <Badge 
-                    variant={confidence >= 80 ? "default" : confidence >= 60 ? "secondary" : "outline"}
-                    className="text-xs"
-                  >
-                    {confidence.toFixed(1)}%
-                  </Badge>
-                </div>
-                
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <div>✓ Fish body shape and proportions analyzed</div>
-                  <div>✓ Color patterns and texture features extracted</div>
-                  <div>✓ Species-specific characteristics identified</div>
-                </div>
-              </div>
-            </Card>
           </div>
         )}
       </div>
-      
-      {/* Toggle Button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setShowOverlay(!showOverlay)}
-        className="absolute top-2 right-2 bg-card/90 backdrop-blur-sm"
-      >
-        {showOverlay ? (
-          <>
-            <EyeOff className="w-4 h-4 mr-1" />
-            Hide AI
-          </>
-        ) : (
-          <>
-            <Eye className="w-4 h-4 mr-1" />
-            Show AI
-          </>
-        )}
-      </Button>
+
+      {/* Bottom Control Bar */}
+      <div className="absolute bottom-4 right-4 flex gap-2 z-10">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowOverlay(!showOverlay)}
+          className="bg-slate-900/60 backdrop-blur-md text-white hover:bg-slate-800 border border-white/10 text-xs h-8"
+        >
+          {showOverlay ? (
+            <><EyeOff className="w-3 h-3 mr-2" /> {t('analyze.hideHud')}</>
+          ) : (
+            <><Eye className="w-3 h-3 mr-2" /> {t('analyze.showHud')}</>
+          )}
+        </Button>
+      </div>
     </div>
   );
 };
