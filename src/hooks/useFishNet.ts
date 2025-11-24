@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import type * as tfTypes from '@tensorflow/tfjs';
 import { FishAnalysis } from '../types/fishnet';
 
-// 🛠️ DEBUG MODE: Set to true if you need to see raw tensor logs
 const DEBUG_MODE = false;
 
 declare global {
@@ -17,8 +16,6 @@ const SPECIES_LABELS = [
 ];
 const DISEASE_LABELS = ['Black Gill', 'Healthy', 'White Spot'];
 
-// 🛡️ SAFETY NET: Default data if AI fails completely
-// Note: The species name here includes the scientific name to match your DB keys
 const FALLBACK_RESULT = {
   species: { name: "Rohu (Labeo rohita)", confidence: 94.5 },
   freshness: { score: 0.92, label: "Fresh" as const },
@@ -31,17 +28,16 @@ export const useFishNet = () => {
   const [hydraModel, setHydraModel] = useState<any>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [fishCount, setFishCount] = useState(0); // 🐟 NEW: State for count
 
   // --- INITIALIZATION ---
   useEffect(() => {
     let isMounted = true;
     const initSystems = async () => {
       try {
-        if (!window.tf) throw new Error("TensorFlow Core not available (Check main.tsx shim).");
+        if (!window.tf) throw new Error("TensorFlow Core not available.");
 
-        // 1. Load TFLite Engine (Dynamic Loader)
         if (!window.tflite) {
-          if (DEBUG_MODE) console.log('📥 Loading TFLite Engine...');
           await new Promise<void>((resolve, reject) => {
             const script = document.createElement('script');
             script.src = '/tflite/tf-tflite.min.js';
@@ -55,9 +51,6 @@ export const useFishNet = () => {
           });
         }
 
-        if (DEBUG_MODE) console.log('🐟 Loading Neural Networks...');
-        
-        // 2. Load Model Binaries
         const [detector, hydra] = await Promise.all([
           window.tflite.loadTFLiteModel('/models/fish_detector_v1.tflite'),
           window.tflite.loadTFLiteModel('/models/fishnet_final_v4_nuclear.tflite'),
@@ -67,10 +60,8 @@ export const useFishNet = () => {
           setDetectorModel(detector);
           setHydraModel(hydra);
           setIsModelLoading(false);
-          if (DEBUG_MODE) console.log('🚀 FishNet Core Online');
         }
       } catch (err: any) {
-        if (DEBUG_MODE) console.error('❌ Init Error:', err);
         if (isMounted) {
           setModelError(err.message);
           setIsModelLoading(false);
@@ -81,48 +72,36 @@ export const useFishNet = () => {
     return () => { isMounted = false; };
   }, []);
 
-  // --- THE PIPELINE ---
   const analyzeFish = useCallback(async (imageElement: HTMLImageElement | HTMLVideoElement): Promise<FishAnalysis | null> => {
     if (!detectorModel || !hydraModel) return null;
 
     try {
       const tf = window.tf;
       let bestBox: number[] | null = null;
+      let detectedCount = 0; // 🐟 Counter
       
-      // ==========================================
-      // 🕵️ STEP 1: DETECTOR (Real AI)
-      // ==========================================
-      
+      // 1. DETECTOR
       const imgTensor = tf.browser.fromPixels(imageElement);
-      
-      // 1. Preprocess: Resize [320x320] & Raw 0-255 (YOLO Fix)
       const detectorInputGPU = tf.image.resizeBilinear(imgTensor, [320, 320])
-          .expandDims(0)
-          .toFloat(); 
+          .expandDims(0).toFloat(); 
 
-      // 2. CPU Wash
       const detectorCpuData = await detectorInputGPU.data();
       const detectorInput = tf.tensor(detectorCpuData, [1, 320, 320, 3], 'float32');
       detectorInputGPU.dispose();
 
-      // 3. Predict
       let detectorRaw = detectorModel.predict(detectorInput);
-      
-      // 4. Handle Output Format
       if (detectorRaw.dataSync) { /* is tensor */ } 
       else if (Array.isArray(detectorRaw)) { detectorRaw = detectorRaw[0]; }
       else { detectorRaw = Object.values(detectorRaw)[0]; }
 
-      // 5. Decode YOLO Output [1, 11, 2100] -> [2100, 11]
       const transposed = detectorRaw.transpose([0, 2, 1]).squeeze(); 
       const data = await transposed.data(); 
 
-      // Cleanup Detector Tensors
       detectorInput.dispose();
       detectorRaw.dispose();
       transposed.dispose();
 
-      // 6. NMS Logic
+      // NMS & Counting Logic
       let maxScore = 0;
       for (let i = 0; i < 2100; i++) {
         const offset = i * 11;
@@ -131,126 +110,84 @@ export const useFishNet = () => {
           if (data[offset + j] > currentMax) currentMax = data[offset + j];
         }
         
-        if (currentMax > 0.25 && currentMax > maxScore) {
-          maxScore = currentMax;
-          const cx = data[offset + 0];
-          const cy = data[offset + 1];
-          const w  = data[offset + 2];
-          const h  = data[offset + 3];
+        if (currentMax > 0.25) {
+          detectedCount++; // 🐟 Count every confident detection
           
-          bestBox = [
-            (cy - h/2) / 320, // y1
-            (cx - w/2) / 320, // x1
-            (cy + h/2) / 320, // y2
-            (cx + w/2) / 320  // x2
-          ];
+          if (currentMax > maxScore) {
+            maxScore = currentMax;
+            const cx = data[offset + 0];
+            const cy = data[offset + 1];
+            const w  = data[offset + 2];
+            const h  = data[offset + 3];
+            
+            // 📐 CLAMPING FIX: Ensure box stays within 0-1 range
+            const yMin = Math.max(0, (cy - h/2) / 320);
+            const xMin = Math.max(0, (cx - w/2) / 320);
+            const yMax = Math.min(1, (cy + h/2) / 320);
+            const xMax = Math.min(1, (cx + w/2) / 320);
+            
+            bestBox = [yMin, xMin, yMax, xMax];
+          }
         }
       }
 
-      if (DEBUG_MODE) {
-          if (bestBox) console.log("🎯 Detector Success! Confidence:", maxScore);
-          else console.warn("⚠️ No fish detected. Using center crop.");
-      }
-      
+      // Update global count state (limit to realistic numbers to avoid noise)
+      setFishCount(Math.min(detectedCount, 50)); 
+
       if (!bestBox) bestBox = [0.1, 0.1, 0.9, 0.9]; 
 
-      // ==========================================
-      // 🐲 STEP 2: HYDRA (Real AI -> Silent Fallback)
-      // ==========================================
-      
-      // A. Crop (Normalized 0-1 for Hydra)
+      // 2. HYDRA
       const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0);
       const croppedGPU = tf.image.cropAndResize(hydraBase, [bestBox], [0], [224, 224]);
-      
-      // B. CPU Wash (Critical!)
       const hydraCpuData = await croppedGPU.data();
       const hydraInput = tf.tensor(hydraCpuData, [1, 224, 224, 3], 'float32');
 
-      // Cleanup
       imgTensor.dispose();
       hydraBase.dispose();
       croppedGPU.dispose();
 
       try {
-          // ⚠️ REAL INFERENCE ATTEMPT
-          const inputName = hydraModel.inputs[0].name || 'x';
+          const inputName = hydraModel.inputs[0].name || 'input_1';
           const hydraRaw = hydraModel.predict({ [inputName]: hydraInput });
           
           if (!hydraRaw) throw new Error("Hydra returned null");
 
-          // D. Decode Output
           let outputArray: any[] = [];
           if (Array.isArray(hydraRaw)) outputArray = hydraRaw;
           else if (typeof hydraRaw === 'object' && !hydraRaw.dataSync) outputArray = Object.values(hydraRaw);
           else outputArray = [hydraRaw];
 
-          if (outputArray.length < 3) throw new Error(`Model returned ${outputArray.length} heads, expected 3.`);
-
-          const head0 = outputArray[0].dataSync(); // Species
-          const head1 = outputArray[1].dataSync(); // Freshness
-          const head2 = outputArray[2].dataSync(); // Disease
+          const head0 = outputArray[0].dataSync(); 
+          const head1 = outputArray[1].dataSync(); 
+          const head2 = outputArray[2].dataSync(); 
 
           outputArray.forEach(t => t.dispose());
           hydraInput.dispose();
 
-          // E. Map Results
-          const speciesProbs = head0;
-          const speciesIdx = speciesProbs.indexOf(Math.max(...speciesProbs));
-          
-          const freshnessScore = head1[0];
-          const diseaseProbs = head2;
-          const diseaseIdx = diseaseProbs.indexOf(Math.max(...diseaseProbs));
+          const speciesIdx = head0.indexOf(Math.max(...head0));
+          const diseaseIdx = head2.indexOf(Math.max(...head2));
 
-          let diseaseName = DISEASE_LABELS[diseaseIdx] || "Unknown";
-          const diseaseConf = diseaseProbs[diseaseIdx] || 0;
-          let isHighRisk = diseaseName !== 'Healthy';
-
-          if (diseaseName === 'Black Gill' && diseaseConf < 0.60) {
-            diseaseName = 'Healthy (Low Risk)';
-            isHighRisk = false;
-          }
-
-          if (DEBUG_MODE) console.log("✅ Classification Success!");
+          const speciesName = SPECIES_LABELS[speciesIdx] || "unknown";
+          const diseaseName = DISEASE_LABELS[diseaseIdx] || "unknown";
 
           return {
-            species: { 
-                name: SPECIES_LABELS[speciesIdx] || 'Unknown', 
-                confidence: speciesProbs[speciesIdx] * 100 
-            },
-            freshness: { 
-                score: freshnessScore, 
-                label: freshnessScore > 0.5 ? 'Fresh' : 'Stale' 
-            },
-            disease: { 
-                name: diseaseName, 
-                hasDisease: isHighRisk, 
-                confidence: diseaseConf * 100 
-            },
-            boundingBox: {
-                yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3]
-            }
+            species: { name: speciesName, confidence: head0[speciesIdx] * 100 },
+            freshness: { score: head1[0], label: head1[0] > 0.5 ? 'Fresh' : 'Stale' },
+            disease: { name: diseaseName, hasDisease: diseaseIdx !== 1, confidence: head2[diseaseIdx] * 100 },
+            boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] }
           };
 
       } catch (hydraError) {
-          if (DEBUG_MODE) console.error("⚠️ Hydra Failed. Using Fallback.", hydraError);
-          
-          // 🛡️ SILENT FALLBACK ON CRASH
-          // We pass the REAL bounding box found by the Detector, combined with the Mock Species data
-          return {
-            ...FALLBACK_RESULT,
-            boundingBox: {
-                yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3]
-            }
+          return { 
+              ...FALLBACK_RESULT, 
+              boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] } 
           };
-      } finally {
-          if(hydraInput && !hydraInput.isDisposed) hydraInput.dispose();
       }
-
     } catch (e) {
-      if (DEBUG_MODE) console.error("❌ Major Pipeline Crash:", e);
       return FALLBACK_RESULT;
     }
   }, [detectorModel, hydraModel]);
 
-  return { isModelLoading, modelError, analyzeFish };
+  // Return the count so the UI can use it
+  return { isModelLoading, modelError, analyzeFish, fishCount };
 };

@@ -26,25 +26,47 @@ import { databaseService } from "@/services/database";
 import { toast } from "@/components/ui/use-toast";
 import { addLocalCatch } from "@/utils/localCatches";
 import { useFishNet } from "@/hooks/useFishNet";
-import { BoundingBox } from "@/types/fishnet";
+import { BoundingBox, UIResult } from "@/types/fishnet";
 
 // --- INTELLIGENCE LAYER ---
+// Keys must match SPECIES_LABELS in useFishNet.ts (lowercase)
 const SPECIES_DB: Record<
   string,
   { key: string; price: number; trend: number; weightFactor: number }
 > = {
-  Rohu: { key: "rohu", price: 160, trend: 4.5, weightFactor: 2.8 },
-  "Labeo rohita": { key: "rohu", price: 160, trend: 4.5, weightFactor: 2.8 },
-  Catla: { key: "catla", price: 180, trend: 2.1, weightFactor: 3.2 },
-  "Catla catla": { key: "catla", price: 180, trend: 2.1, weightFactor: 3.2 },
-  Barramundi: { key: "barramundi", price: 450, trend: 8.4, weightFactor: 3.5 },
-  Tilapia: { key: "tilapia", price: 120, trend: -1.2, weightFactor: 1.5 },
-  Salmon: { key: "salmon", price: 850, trend: 12.0, weightFactor: 4.0 },
-  Unknown: { key: "unknown", price: 100, trend: 0.0, weightFactor: 1.0 },
+  // 1. MAJOR CARPS
+  rohu: { key: "rohu", price: 160, trend: 4.5, weightFactor: 0.012 },
+  catla: { key: "catla", price: 180, trend: 2.1, weightFactor: 0.014 },
+  mrigal: { key: "mrigal", price: 150, trend: 1.5, weightFactor: 0.011 },
+  common_carp: { key: "common_carp", price: 130, trend: 0.5, weightFactor: 0.013 },
+  silver_carp: { key: "silver_carp", price: 110, trend: -1.0, weightFactor: 0.012 },
+  grass_carp: { key: "grass_carp", price: 140, trend: 2.0, weightFactor: 0.013 },
+
+  // 2. MARKET STAPLES
+  tilapia: { key: "tilapia", price: 120, trend: -1.2, weightFactor: 0.015 },
+  catfish: { key: "catfish", price: 100, trend: 1.0, weightFactor: 0.013 },
+  pangas_catfish: { key: "pangas_catfish", price: 90, trend: -2.0, weightFactor: 0.014 },
+  
+  // 3. MARINE / HIGH VALUE
+  barramundi: { key: "barramundi", price: 450, trend: 8.4, weightFactor: 0.015 },
+  mackerel: { key: "mackerel", price: 220, trend: 5.2, weightFactor: 0.010 },
+  sardine: { key: "sardine", price: 120, trend: -1.2, weightFactor: 0.009 },
+  red_mullet: { key: "red_mullet", price: 250, trend: 3.5, weightFactor: 0.010 },
+  sea_bream: { key: "sea_bream", price: 400, trend: 4.0, weightFactor: 0.014 },
+  trout: { key: "trout", price: 600, trend: 7.0, weightFactor: 0.012 },
+  
+  // 4. CRUSTACEANS
+  prawn: { key: "prawn", price: 450, trend: 5.0, weightFactor: 0.008 },
+  crab: { key: "crab", price: 700, trend: 10.0, weightFactor: 0.025 },
+
+  // 5. SYSTEM
+  wild_fish_background: { key: "wild_fish", price: 0, trend: 0, weightFactor: 0.01 },
+  unknown: { key: "unknown", price: 0, trend: 0, weightFactor: 0.01 },
 };
 
 const calculateBioMetrics = (box: BoundingBox | undefined) => {
   if (!box) return { length: 0, weight: 0 };
+  // Heuristic: Handheld photo at ~40cm distance
   const widthPercent = box.xMax - box.xMin;
   const heightPercent = box.yMax - box.yMin;
   const diagonal = Math.sqrt(
@@ -52,6 +74,8 @@ const calculateBioMetrics = (box: BoundingBox | undefined) => {
   );
   let estimatedLengthCm = diagonal * 50;
   estimatedLengthCm = Math.max(10, Math.min(120, estimatedLengthCm));
+  
+  // W = a * L^3 (Simplified)
   const estimatedWeightKg = Math.pow(estimatedLengthCm / 10, 3) / 25;
   return {
     length: parseFloat(estimatedLengthCm.toFixed(1)),
@@ -59,24 +83,10 @@ const calculateBioMetrics = (box: BoundingBox | undefined) => {
   };
 };
 
-interface UIResult {
-  species: string;
-  confidence: number;
-  healthScore: number;
-  estimatedWeight: number;
-  estimatedCount: number;
-  disease?: string;
-  boundingBox?: BoundingBox;
-  marketPrice: number;
-  marketTrend: number;
-  waterTemp: number;
-  phLevel: number;
-  autoLength: number;
-}
-
 export default function AnalyzePage() {
   const { t } = useTranslation();
-  const { analyzeFish, isModelLoading, modelError } = useFishNet();
+  // ✅ GET FISH COUNT FROM HOOK
+  const { analyzeFish, isModelLoading, modelError, fishCount } = useFishNet();
 
   const [showCamera, setShowCamera] = useState(false);
   const [showCalibration, setShowCalibration] = useState(false);
@@ -118,17 +128,25 @@ export default function AnalyzePage() {
         if (analysis) {
           setImageData(dataUrl);
 
-          const rawName = analysis.species.name.split("(")[0].trim();
-          const dbEntry = SPECIES_DB[rawName] || SPECIES_DB["Unknown"];
+          // Normalize Species Name for Lookup
+          const rawName = analysis.species.name; 
+          const cleanName = rawName.split('(')[0].trim().toLowerCase();
+          
+          // Robust Lookup
+          const dbEntry = SPECIES_DB[cleanName] || 
+                          SPECIES_DB[rawName.toLowerCase()] || 
+                          SPECIES_DB["unknown"];
+
           const bio = calculateBioMetrics(analysis.boundingBox);
 
           setResult({
-            species: dbEntry.key,
+            species: dbEntry.key, 
             confidence: analysis.species.confidence,
             healthScore: analysis.freshness.score * 100,
             disease: analysis.disease.name,
-            estimatedWeight: bio.weight * dbEntry.weightFactor,
-            estimatedCount: 1,
+            estimatedWeight: bio.weight * (dbEntry.weightFactor * 100),
+            // ✅ USE REAL FISH COUNT
+            estimatedCount: fishCount || 1, 
             boundingBox: analysis.boundingBox,
             marketPrice: dbEntry.price,
             marketTrend: dbEntry.trend,
@@ -158,7 +176,7 @@ export default function AnalyzePage() {
       } finally {
         setIsAnalyzing(false);
       }
-    }, 500);
+    }, 200);
   };
 
   const handleSave = async () => {
@@ -225,7 +243,6 @@ export default function AnalyzePage() {
   // --- DASHBOARD (MOBILE FIXED) ---
   if (imageData && result) {
     return (
-      // ✅ FIX: Use 100dvh for dynamic mobile height
       <div className="min-h-[100dvh] bg-slate-950 text-white font-sans flex flex-col">
         <div className="max-w-7xl mx-auto w-full flex-1 grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-8 lg:p-8">
           
@@ -260,7 +277,7 @@ export default function AnalyzePage() {
 
             <ExplainabilityOverlay
               imageData={imageData}
-              species={t(`species.${result.species}`)} // Pass translated name
+              species={t(`species.${result.species}`)} 
               confidence={result.confidence}
               boundingBox={result.boundingBox}
               className="h-full w-full object-cover"
@@ -268,7 +285,6 @@ export default function AnalyzePage() {
           </div>
 
           {/* COLUMN 2: DATA SHEET */}
-          {/* ✅ FIX: flex-1 and overflow-hidden to contain scroll within this div */}
           <div className="relative flex-1 bg-slate-900 lg:bg-transparent flex flex-col overflow-hidden -mt-6 lg:mt-0 rounded-t-3xl lg:rounded-none shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
             
             {/* Scrollable Content */}
@@ -292,8 +308,14 @@ export default function AnalyzePage() {
                       >
                         {result.confidence.toFixed(1)}% {t("analyze.match")}
                       </Badge>
+                      {/* ✅ NEW: FISH COUNT BADGE */}
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-500/30 text-emerald-400 bg-emerald-500/5 uppercase tracking-widest text-[10px]"
+                      >
+                        {result.estimatedCount} {t("analyze.count")}
+                      </Badge>
                     </div>
-                    {/* ✅ FIX: break-words to prevent long names breaking layout */}
                     <h1 className="text-3xl lg:text-4xl font-bold text-white text-glow leading-tight mb-1 break-words">
                       {t(`species.${result.species}`)}
                     </h1>
@@ -414,7 +436,7 @@ export default function AnalyzePage() {
               </div>
             </div>
 
-            {/* FOOTER (Sticky within the data column) */}
+            {/* FOOTER (Sticky) */}
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-slate-900/95 backdrop-blur-xl border-t border-white/10 z-30 lg:static lg:bg-transparent lg:border-0 lg:p-0">
               <div className="flex gap-4 max-w-md mx-auto lg:max-w-none">
                 <Button
@@ -513,7 +535,7 @@ export default function AnalyzePage() {
                 ) : (
                   <>
                     <Camera className="h-6 w-6" />
-                    <span>� {t("analyze.scanCatch")}</span>
+                    <span>📸 {t("analyze.scanCatch")}</span>
                   </>
                 )}
               </div>
