@@ -10,6 +10,7 @@ declare global {
   const tf: typeof tfTypes; 
 }
 
+// 📋 LABELS (18 Classes - Matches your Model)
 const SPECIES_LABELS = [
   'catfish', 'catla', 'common_carp', 'crab', 'grass_carp', 
   'mackerel', 'mrigal', 'pink_perch', 'prawn', 'red_mullet', 
@@ -83,10 +84,10 @@ export const useFishNet = () => {
       let bestBox: number[] | null = null;
       let detectedCount = 0;
       
-      // 1. DETECTOR
+      // 1. DETECTOR (Int8)
       const imgTensor = tf.browser.fromPixels(imageElement);
       const detectorInputGPU = tf.image.resizeBilinear(imgTensor, [320, 320])
-          .expandDims(0).toFloat().div(255.0); 
+          .expandDims(0).toFloat().div(255.0); // Normalize 0-1
 
       const detectorCpuData = await detectorInputGPU.data();
       const detectorInput = tf.tensor(detectorCpuData, [1, 320, 320, 3], 'float32');
@@ -104,7 +105,7 @@ export const useFishNet = () => {
       detectorRaw.dispose();
       transposed.dispose();
 
-      // NMS
+      // NMS Logic
       let maxScore = 0;
       for (let i = 0; i < 2100; i++) {
         const offset = i * 11;
@@ -112,6 +113,7 @@ export const useFishNet = () => {
         for (let j = 4; j < 11; j++) {
           if (data[offset + j] > currentMax) currentMax = data[offset + j];
         }
+        
         if (currentMax > 0.25) {
           detectedCount++;
           if (currentMax > maxScore) {
@@ -121,10 +123,8 @@ export const useFishNet = () => {
             const w  = data[offset + 2];
             const h  = data[offset + 3];
             
-            // Scale Fix
-            const isNormalized = cx < 1.5 && w < 1.5;
-            const scale = isNormalized ? 1.0 : 320.0;
-
+            // Scale Fix (Normalized output)
+            const scale = 1.0; 
             bestBox = [
                Math.max(0, (cy - h/2) / scale),
                Math.max(0, (cx - w/2) / scale),
@@ -136,19 +136,12 @@ export const useFishNet = () => {
       }
       setFishCount(Math.min(detectedCount, 50));
       if (!bestBox) bestBox = [0.1, 0.1, 0.9, 0.9]; 
-      
-      if (DEBUG_MODE) console.log("📦 DETECTED BOX:", bestBox);
 
-      // 2. HYDRA
-      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0); // <--- DIVIDE IS MANDATORY
+      // 2. HYDRA (Float32)
+      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0);
       const croppedGPU = tf.image.cropAndResize(hydraBase, [bestBox], [0], [224, 224]);
       const hydraCpuData = await croppedGPU.data();
       const hydraInput = tf.tensor(hydraCpuData, [1, 224, 224, 3], 'float32');
-
-      if (DEBUG_MODE) {
-        const meanVal = tf.mean(hydraInput).dataSync()[0];
-        console.log(`🧪 Hydra Input Brightness: ${meanVal.toFixed(3)} (Should be > 0.2)`);
-      }
 
       imgTensor.dispose();
       hydraBase.dispose();
@@ -165,16 +158,16 @@ export const useFishNet = () => {
           else if (typeof hydraRaw === 'object' && !hydraRaw.dataSync) outputArray = Object.values(hydraRaw);
           else outputArray = [hydraRaw];
 
-          const head0 = outputArray[0].dataSync(); 
-          const head1 = outputArray[1].dataSync(); 
-          const head2 = outputArray[2].dataSync(); 
+          const head0 = outputArray[0].dataSync(); // Species
+          const head1 = outputArray[1].dataSync(); // Freshness
+          const head2 = outputArray[2].dataSync(); // Disease
 
           outputArray.forEach(t => t.dispose());
           hydraInput.dispose();
 
-          // --- 🧠 SMART SELECTION LOGIC ---
+          // --- 🧠 SMART SELECTION LOGIC V3 ---
           
-          // 1. Sort predictions by confidence
+          // 1. Rank predictions
           const predictions = Array.from(head0).map((p: any, i) => ({
               index: i,
               label: SPECIES_LABELS[i],
@@ -182,19 +175,33 @@ export const useFishNet = () => {
           }));
           predictions.sort((a: any, b: any) => b.score - a.score);
 
-          if (DEBUG_MODE) {
-             console.log("🏆 Top 3 Predictions:", 
-                 predictions.slice(0,3).map(p => `${p.label}: ${(p.score*100).toFixed(1)}%`)
-             );
+          let finalChoice = predictions[0];
+          
+          // 2. "Anti-Coward" Filter
+          // If the model picks Background, but a real fish is in 2nd place (>5%), take the real fish.
+          if (finalChoice.label === 'wild_fish_background') {
+              const runnerUp = predictions[1];
+              const thirdPlace = predictions[2];
+
+              if (runnerUp.score > 0.05) {
+                  if (DEBUG_MODE) console.log(`🔄 Override: Swapped Background for '${runnerUp.label}'`);
+                  finalChoice = runnerUp;
+              }
+              // Special check for Crustaceans (often 3rd place)
+              else if (thirdPlace.score > 0.05 && ['prawn', 'crab'].includes(thirdPlace.label)) {
+                   if (DEBUG_MODE) console.log(`🔄 Deep Override: Rescued '${thirdPlace.label}' from 3rd place`);
+                   finalChoice = thirdPlace;
+              }
           }
 
-          // 2. Logic: If #1 is "Wild Fish" but #2 is valid, pick #2
-          let finalChoice = predictions[0];
-          const runnerUp = predictions[1];
-
-          if (finalChoice.label === 'wild_fish_background' && runnerUp.score > 0.10) {
-               if (DEBUG_MODE) console.log("🔄 Override: Ignoring 'Wild Fish' for", runnerUp.label);
-               finalChoice = runnerUp;
+          // 3. "Catla/Sea Bass" Confusion Fix
+          // If Sea Bass is < 50% confident, and Catla/Rohu is nearby, swap to Carp.
+          if (finalChoice.label === 'sea_bass' && finalChoice.score < 0.50) {
+               const carp = predictions.find(p => ['catla', 'rohu', 'mrigal'].includes(p.label));
+               if (carp && carp.score > 0.05) {
+                   if (DEBUG_MODE) console.log("🔄 Correction: Low conf Sea Bass -> Swapped to Carp");
+                   finalChoice = carp;
+               }
           }
 
           const speciesIdx = finalChoice.index;
@@ -202,6 +209,8 @@ export const useFishNet = () => {
 
           const diseaseIdx = head2.indexOf(Math.max(...head2));
           const diseaseName = DISEASE_LABELS[diseaseIdx] || "unknown";
+
+          if (DEBUG_MODE) console.log("🏆 Winner:", speciesName);
 
           return {
             species: { name: speciesName, confidence: finalChoice.score * 100 },
