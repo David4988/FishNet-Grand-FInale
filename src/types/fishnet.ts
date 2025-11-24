@@ -1,12 +1,8 @@
-// src/types/fishnet.ts
-
 export interface BoundingBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  class: string;
-  score: number;
+  yMin: number;
+  xMin: number;
+  yMax: number;
+  xMax: number;
 }
 
 export interface FishAnalysis {
@@ -15,13 +11,30 @@ export interface FishAnalysis {
     confidence: number;
   };
   freshness: {
-    score: number; // 0.0 to 1.0
+    score: number;
     label: 'Fresh' | 'Stale';
   };
   disease: {
     name: string;
-    hasDisease: boolean; // True if White Spot or Black Gill > threshold
+    hasDisease: boolean;
     confidence: number;
   };
+  // The Real Detection Box (Normalized 0-1)
   boundingBox?: BoundingBox;
+}
+
+// Extended Interface for the "Pro" Dashboard UI
+export interface UIResult extends FishAnalysis {
+  estimatedWeight: number;
+  estimatedCount: number;
+  
+  // Rich Data Fields
+  marketPrice: number;
+  marketTrend: number;
+  waterTemp: number;
+  phLevel: number;
+  
+  // Biometrics
+  autoLength: number;
+  manualLength?: string | number;
 }
