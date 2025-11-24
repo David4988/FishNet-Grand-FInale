@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ["sql.js"],
+    exclude: ['@tensorflow/tfjs-tflite'],
   },
   define: {
     global: "globalThis",
