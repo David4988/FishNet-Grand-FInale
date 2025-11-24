@@ -29,37 +29,39 @@ import { useFishNet } from "@/hooks/useFishNet";
 import { BoundingBox, UIResult } from "@/types/fishnet";
 
 // --- INTELLIGENCE LAYER ---
-// Keys must match SPECIES_LABELS in useFishNet.ts (lowercase)
+// Keys match the lowercase SPECIES_LABELS from useFishNet.ts
+// --- INTELLIGENCE LAYER ---
 const SPECIES_DB: Record<
   string,
   { key: string; price: number; trend: number; weightFactor: number }
 > = {
-  // 1. MAJOR CARPS
+  // --- 1. CARPS ---
   rohu: { key: "rohu", price: 160, trend: 4.5, weightFactor: 0.012 },
   catla: { key: "catla", price: 180, trend: 2.1, weightFactor: 0.014 },
   mrigal: { key: "mrigal", price: 150, trend: 1.5, weightFactor: 0.011 },
   common_carp: { key: "common_carp", price: 130, trend: 0.5, weightFactor: 0.013 },
-  silver_carp: { key: "silver_carp", price: 110, trend: -1.0, weightFactor: 0.012 },
   grass_carp: { key: "grass_carp", price: 140, trend: 2.0, weightFactor: 0.013 },
+  silver_carp: { key: "silver_carp", price: 110, trend: -1.0, weightFactor: 0.012 },
 
-  // 2. MARKET STAPLES
+  // --- 2. MARKET STAPLES ---
   tilapia: { key: "tilapia", price: 120, trend: -1.2, weightFactor: 0.015 },
   catfish: { key: "catfish", price: 100, trend: 1.0, weightFactor: 0.013 },
-  pangas_catfish: { key: "pangas_catfish", price: 90, trend: -2.0, weightFactor: 0.014 },
-  
-  // 3. MARINE / HIGH VALUE
-  barramundi: { key: "barramundi", price: 450, trend: 8.4, weightFactor: 0.015 },
+  sea_bass: { key: "sea_bass", price: 450, trend: 8.4, weightFactor: 0.015 }, 
+
+  // --- 3. MARINE ---
   mackerel: { key: "mackerel", price: 220, trend: 5.2, weightFactor: 0.010 },
-  sardine: { key: "sardine", price: 120, trend: -1.2, weightFactor: 0.009 },
   red_mullet: { key: "red_mullet", price: 250, trend: 3.5, weightFactor: 0.010 },
   sea_bream: { key: "sea_bream", price: 400, trend: 4.0, weightFactor: 0.014 },
+  pink_perch: { key: "pink_perch", price: 180, trend: 1.5, weightFactor: 0.011 },
+  sprat: { key: "sprat", price: 90, trend: -0.5, weightFactor: 0.005 },
+  sardine: { key: "sardine", price: 120, trend: -1.2, weightFactor: 0.009 },
   trout: { key: "trout", price: 600, trend: 7.0, weightFactor: 0.012 },
-  
-  // 4. CRUSTACEANS
+
+  // --- 4. SHELLFISH ---
   prawn: { key: "prawn", price: 450, trend: 5.0, weightFactor: 0.008 },
   crab: { key: "crab", price: 700, trend: 10.0, weightFactor: 0.025 },
 
-  // 5. SYSTEM
+  // --- 5. SYSTEM ---
   wild_fish_background: { key: "wild_fish", price: 0, trend: 0, weightFactor: 0.01 },
   unknown: { key: "unknown", price: 0, trend: 0, weightFactor: 0.01 },
 };
