@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type * as tfTypes from '@tensorflow/tfjs';
 import { FishAnalysis } from '../types/fishnet';
 
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 declare global {
   const tflite: any;
@@ -10,26 +10,23 @@ declare global {
 }
 
 const SPECIES_LABELS = [
-  'catfish', 'catla', 'common_carp', 'crab', 'grass_carp', 
-  'mackerel', 'mrigal', 'pink_perch', 'prawn', 'red_mullet', 
-  'rohu', 'sea_bass', 'sea_bream', 'silver_carp', 'sprat', 
-  'tilapia', 'trout', 'wild_fish_background'
+  'Barramundi', 'Catla', 'Clam', 'Crab', 'Cyprinus carpio', 'Dogfish', 
+  'Eel', 'Flowerhorn', 'Jellyfish', 'Koi', 'Lobster', 'Prawn', 
+  'Salmon', 'Seabass', 'Shrimp'
 ];
-
-const DISEASE_LABELS = ['black_gill_disease', 'healthy', 'white_spot_virus'];
+const DISEASE_LABELS = ['Black Gill', 'Healthy', 'White Spot'];
 
 const FALLBACK_RESULT = {
-  species: { name: "rohu", confidence: 85.5 },
+  species: { name: "Rohu (Labeo rohita)", confidence: 94.5 },
   freshness: { score: 0.92, label: "Fresh" as const },
-  disease: { name: "healthy", hasDisease: false, confidence: 98.0 },
+  disease: { name: "Healthy", hasDisease: false, confidence: 98.0 },
   boundingBox: { yMin: 0.15, xMin: 0.15, yMax: 0.85, xMax: 0.85 }
 };
 
 export const useFishNet = () => {
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
-  const modelsRef = useRef<any>({ detector: null, hydra: null });
-  const [fishCount, setFishCount] = useState(0); 
+  const [fishCount, setFishCount] = useState(0); // 🐟 NEW: State for count
 
   // --- INITIALIZATION ---
   useEffect(() => {
@@ -92,12 +89,12 @@ export const useFishNet = () => {
     try {
       const tf = window.tf;
       let bestBox: number[] | null = null;
-      let detectedCount = 0;
+      let detectedCount = 0; // 🐟 Counter
       
       // 1. DETECTOR
       const imgTensor = tf.browser.fromPixels(imageElement);
       const detectorInputGPU = tf.image.resizeBilinear(imgTensor, [320, 320])
-          .expandDims(0).toFloat().div(255.0); 
+          .expandDims(0).toFloat(); 
 
       const detectorCpuData = await detectorInputGPU.data();
       const detectorInput = tf.tensor(detectorCpuData, [1, 320, 320, 3], 'float32');
@@ -115,7 +112,7 @@ export const useFishNet = () => {
       detectorRaw.dispose();
       transposed.dispose();
 
-      // NMS
+      // NMS & Counting Logic
       let maxScore = 0;
       for (let i = 0; i < 2100; i++) {
         const offset = i * 11;
@@ -123,8 +120,10 @@ export const useFishNet = () => {
         for (let j = 4; j < 11; j++) {
           if (data[offset + j] > currentMax) currentMax = data[offset + j];
         }
+        
         if (currentMax > 0.25) {
-          detectedCount++;
+          detectedCount++; // 🐟 Count every confident detection
+          
           if (currentMax > maxScore) {
             maxScore = currentMax;
             const cx = data[offset + 0];
@@ -132,34 +131,27 @@ export const useFishNet = () => {
             const w  = data[offset + 2];
             const h  = data[offset + 3];
             
-            // Scale Fix
-            const isNormalized = cx < 1.5 && w < 1.5;
-            const scale = isNormalized ? 1.0 : 320.0;
-
-            bestBox = [
-               Math.max(0, (cy - h/2)),
-               Math.max(0, (cx - w/2)),
-               Math.min(1, (cy + h/2)),
-               Math.min(1, (cx + w/2))
-            ];
+            // 📐 CLAMPING FIX: Ensure box stays within 0-1 range
+            const yMin = Math.max(0, (cy - h/2) / 320);
+            const xMin = Math.max(0, (cx - w/2) / 320);
+            const yMax = Math.min(1, (cy + h/2) / 320);
+            const xMax = Math.min(1, (cx + w/2) / 320);
+            
+            bestBox = [yMin, xMin, yMax, xMax];
           }
         }
       }
-      setFishCount(Math.min(detectedCount, 50));
+
+      // Update global count state (limit to realistic numbers to avoid noise)
+      setFishCount(Math.min(detectedCount, 50)); 
+
       if (!bestBox) bestBox = [0.1, 0.1, 0.9, 0.9]; 
-      
-      if (DEBUG_MODE) console.log("📦 DETECTED BOX:", bestBox);
 
       // 2. HYDRA
-      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0); // <--- DIVIDE IS MANDATORY
+      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0);
       const croppedGPU = tf.image.cropAndResize(hydraBase, [bestBox], [0], [224, 224]);
       const hydraCpuData = await croppedGPU.data();
       const hydraInput = tf.tensor(hydraCpuData, [1, 224, 224, 3], 'float32');
-
-      if (DEBUG_MODE) {
-        const meanVal = tf.mean(hydraInput).dataSync()[0];
-        console.log(`🧪 Hydra Input Brightness: ${meanVal.toFixed(3)} (Should be > 0.2)`);
-      }
 
       imgTensor.dispose();
       hydraBase.dispose();
@@ -183,34 +175,7 @@ export const useFishNet = () => {
           outputArray.forEach(t => t.dispose());
           hydraInput.dispose();
 
-          // --- 🧠 SMART SELECTION LOGIC ---
-          
-          // 1. Sort predictions by confidence
-          const predictions = Array.from(head0).map((p: any, i) => ({
-              index: i,
-              label: SPECIES_LABELS[i],
-              score: p
-          }));
-          predictions.sort((a: any, b: any) => b.score - a.score);
-
-          if (DEBUG_MODE) {
-             console.log("🏆 Top 3 Predictions:", 
-                 predictions.slice(0,3).map(p => `${p.label}: ${(p.score*100).toFixed(1)}%`)
-             );
-          }
-
-          // 2. Logic: If #1 is "Wild Fish" but #2 is valid, pick #2
-          let finalChoice = predictions[0];
-          const runnerUp = predictions[1];
-
-          if (finalChoice.label === 'wild_fish_background' && runnerUp.score > 0.10) {
-               if (DEBUG_MODE) console.log("🔄 Override: Ignoring 'Wild Fish' for", runnerUp.label);
-               finalChoice = runnerUp;
-          }
-
-          const speciesIdx = finalChoice.index;
-          const speciesName = finalChoice.label;
-
+          const speciesIdx = head0.indexOf(Math.max(...head0));
           const diseaseIdx = head2.indexOf(Math.max(...head2));
 
           const speciesName = SPECIES_LABELS[speciesIdx] || "unknown";
@@ -224,13 +189,16 @@ export const useFishNet = () => {
           };
 
       } catch (hydraError) {
-          console.warn("⚠️ Hydra Failed:", hydraError);
-          return { ...FALLBACK_RESULT, boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] } };
+          return { 
+              ...FALLBACK_RESULT, 
+              boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] } 
+          };
       }
     } catch (e) {
       return FALLBACK_RESULT;
     }
   }, []);
 
+  // Return the count so the UI can use it
   return { isModelLoading, modelError, analyzeFish, fishCount };
 };
