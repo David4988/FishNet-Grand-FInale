@@ -1,8 +1,12 @@
+// src/types/fishnet.ts
+
 export interface BoundingBox {
-  yMin: number;
-  xMin: number;
-  yMax: number;
-  xMax: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  class: string;
+  score: number;
 }
 
 export interface FishAnalysis {
@@ -11,12 +15,12 @@ export interface FishAnalysis {
     confidence: number;
   };
   freshness: {
-    score: number;
+    score: number; // 0.0 to 1.0
     label: 'Fresh' | 'Stale';
   };
   disease: {
     name: string;
-    hasDisease: boolean;
+    hasDisease: boolean; // True if White Spot or Black Gill > threshold
     confidence: number;
   };
   boundingBox?: BoundingBox;
