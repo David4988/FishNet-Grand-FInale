@@ -94,10 +94,10 @@ export const useFishNet = () => {
       let bestBox: number[] | null = null;
       let detectedCount = 0;
       
-      // --- STEP 1: DETECTOR ---
+      // 1. DETECTOR
       const imgTensor = tf.browser.fromPixels(imageElement);
       const detectorInputGPU = tf.image.resizeBilinear(imgTensor, [320, 320])
-          .expandDims(0).toFloat().div(255.0); // Keep .div(255) for Float32 Detector
+          .expandDims(0).toFloat().div(255.0); 
 
       const detectorCpuData = await detectorInputGPU.data();
       const detectorInput = tf.tensor(detectorCpuData, [1, 320, 320, 3], 'float32');
@@ -115,7 +115,7 @@ export const useFishNet = () => {
       detectorRaw.dispose();
       transposed.dispose();
 
-      // NMS Logic
+      // NMS
       let maxScore = 0;
       for (let i = 0; i < 2100; i++) {
         const offset = i * 11;
@@ -123,7 +123,6 @@ export const useFishNet = () => {
         for (let j = 4; j < 11; j++) {
           if (data[offset + j] > currentMax) currentMax = data[offset + j];
         }
-        
         if (currentMax > 0.25) {
           detectedCount++;
           if (currentMax > maxScore) {
@@ -133,6 +132,10 @@ export const useFishNet = () => {
             const w  = data[offset + 2];
             const h  = data[offset + 3];
             
+            // Scale Fix
+            const isNormalized = cx < 1.5 && w < 1.5;
+            const scale = isNormalized ? 1.0 : 320.0;
+
             bestBox = [
                Math.max(0, (cy - h/2)),
                Math.max(0, (cx - w/2)),
@@ -144,12 +147,19 @@ export const useFishNet = () => {
       }
       setFishCount(Math.min(detectedCount, 50));
       if (!bestBox) bestBox = [0.1, 0.1, 0.9, 0.9]; 
+      
+      if (DEBUG_MODE) console.log("📦 DETECTED BOX:", bestBox);
 
-      // --- STEP 2: HYDRA ---
-      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0);
+      // 2. HYDRA
+      const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0); // <--- DIVIDE IS MANDATORY
       const croppedGPU = tf.image.cropAndResize(hydraBase, [bestBox], [0], [224, 224]);
       const hydraCpuData = await croppedGPU.data();
       const hydraInput = tf.tensor(hydraCpuData, [1, 224, 224, 3], 'float32');
+
+      if (DEBUG_MODE) {
+        const meanVal = tf.mean(hydraInput).dataSync()[0];
+        console.log(`🧪 Hydra Input Brightness: ${meanVal.toFixed(3)} (Should be > 0.2)`);
+      }
 
       imgTensor.dispose();
       hydraBase.dispose();
@@ -173,13 +183,38 @@ export const useFishNet = () => {
           outputArray.forEach(t => t.dispose());
           hydraInput.dispose();
 
-          const speciesIdx = head0.indexOf(Math.max(...head0));
+          // --- 🧠 SMART SELECTION LOGIC ---
+          
+          // 1. Sort predictions by confidence
+          const predictions = Array.from(head0).map((p: any, i) => ({
+              index: i,
+              label: SPECIES_LABELS[i],
+              score: p
+          }));
+          predictions.sort((a: any, b: any) => b.score - a.score);
+
+          if (DEBUG_MODE) {
+             console.log("🏆 Top 3 Predictions:", 
+                 predictions.slice(0,3).map(p => `${p.label}: ${(p.score*100).toFixed(1)}%`)
+             );
+          }
+
+          // 2. Logic: If #1 is "Wild Fish" but #2 is valid, pick #2
+          let finalChoice = predictions[0];
+          const runnerUp = predictions[1];
+
+          if (finalChoice.label === 'wild_fish_background' && runnerUp.score > 0.10) {
+               if (DEBUG_MODE) console.log("🔄 Override: Ignoring 'Wild Fish' for", runnerUp.label);
+               finalChoice = runnerUp;
+          }
+
+          const speciesIdx = finalChoice.index;
+          const speciesName = finalChoice.label;
+
           const diseaseIdx = head2.indexOf(Math.max(...head2));
 
           const speciesName = SPECIES_LABELS[speciesIdx] || "unknown";
           const diseaseName = DISEASE_LABELS[diseaseIdx] || "unknown";
-          
-          if (DEBUG_MODE) console.log("� Winner:", speciesName);
 
           return {
             species: { name: speciesName, confidence: head0[speciesIdx] * 100 },
