@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type * as tfTypes from '@tensorflow/tfjs';
 import { FishAnalysis } from '../types/fishnet';
 
-// 🛠️ DEBUG MODE
 const DEBUG_MODE = true;
 
 declare global {
@@ -10,7 +9,6 @@ declare global {
   const tf: typeof tfTypes; 
 }
 
-// 📋 LABELS (18 Classes - Matches your Model)
 const SPECIES_LABELS = [
   'catfish', 'catla', 'common_carp', 'crab', 'grass_carp', 
   'mackerel', 'mrigal', 'pink_perch', 'prawn', 'red_mullet', 
@@ -21,17 +19,16 @@ const SPECIES_LABELS = [
 const DISEASE_LABELS = ['black_gill_disease', 'healthy', 'white_spot_virus'];
 
 const FALLBACK_RESULT = {
-  species: { name: "rohu", confidence: 94.5 },
+  species: { name: "rohu", confidence: 85.5 },
   freshness: { score: 0.92, label: "Fresh" as const },
   disease: { name: "healthy", hasDisease: false, confidence: 98.0 },
   boundingBox: { yMin: 0.15, xMin: 0.15, yMax: 0.85, xMax: 0.85 }
 };
 
 export const useFishNet = () => {
-  const [detectorModel, setDetectorModel] = useState<any>(null);
-  const [hydraModel, setHydraModel] = useState<any>(null);
   const [isModelLoading, setIsModelLoading] = useState(true);
   const [modelError, setModelError] = useState<string | null>(null);
+  const modelsRef = useRef<any>({ detector: null, hydra: null });
   const [fishCount, setFishCount] = useState(0); 
 
   // --- INITIALIZATION ---
@@ -39,55 +36,68 @@ export const useFishNet = () => {
     let isMounted = true;
     const initSystems = async () => {
       try {
-        if (!window.tf) throw new Error("TensorFlow Core not available.");
+        console.log("� [1] Checking Global Scripts...");
+        
+        // 1. Check Globals
+        if (!window.tf) throw new Error("TensorFlow Core (tf.min.js) not loaded in index.html");
+        if (!window.tflite) throw new Error("TFLite (tf-tflite.min.js) not loaded in index.html");
 
-        if (!window.tflite) {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = '/tflite/tf-tflite.min.js';
-            script.async = true;
-            script.onload = () => {
-              window.tflite.setWasmPath('/tflite/');
-              resolve();
-            };
-            script.onerror = () => reject(new Error("Failed to load TFLite Script"));
-            document.body.appendChild(script);
-          });
-        }
+        console.log("� [2] Setting WASM Path...");
+        window.tflite.setWasmPath('/tflite/');
+
+        // 2. Load Models with Timeout
+        console.log("� [3] Loading Models (Timeout: 10s)...");
+        
+        const loadModelWithTimeout = async (path: string, config: any = {}) => {
+            return Promise.race([
+                window.tflite.loadTFLiteModel(path, config),
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout loading ${path}`)), 10000))
+            ]);
+        };
 
         const [detector, hydra] = await Promise.all([
-          window.tflite.loadTFLiteModel('/models/fish_detector_v1.tflite'),
-          window.tflite.loadTFLiteModel('/models/fishnet_final_v4_nuclear.tflite'),
+          loadModelWithTimeout('/models/fish_detector_v1.tflite'),
+          // Disable XNNPACK to prevent freeze on some devices
+          loadModelWithTimeout('/models/fishnet_final_v4_nuclear.tflite', { enableWebXnnpack: false }), 
         ]);
 
         if (isMounted) {
-          setDetectorModel(detector);
-          setHydraModel(hydra);
+          modelsRef.current = { detector, hydra };
           setIsModelLoading(false);
+          console.log('� [4] FishNet Core Online');
         }
       } catch (err: any) {
+        console.error('❌ Init Error:', err);
         if (isMounted) {
+          // Show the specific error so we know what failed
           setModelError(err.message);
-          setIsModelLoading(false);
+          setIsModelLoading(false); 
         }
       }
     };
-    initSystems();
+    
+    // Short delay to ensure scripts parsed
+    setTimeout(initSystems, 500);
+    
     return () => { isMounted = false; };
   }, []);
 
   const analyzeFish = useCallback(async (imageElement: HTMLImageElement | HTMLVideoElement): Promise<FishAnalysis | null> => {
-    if (!detectorModel || !hydraModel) return null;
+    const { detector: detectorModel, hydra: hydraModel } = modelsRef.current;
+    if (!detectorModel || !hydraModel) {
+        console.warn("⚠️ Models not ready yet.");
+        return null;
+    }
 
     try {
       const tf = window.tf;
       let bestBox: number[] | null = null;
       let detectedCount = 0;
       
-      // 1. DETECTOR (Int8)
+      // --- STEP 1: DETECTOR ---
       const imgTensor = tf.browser.fromPixels(imageElement);
       const detectorInputGPU = tf.image.resizeBilinear(imgTensor, [320, 320])
-          .expandDims(0).toFloat().div(255.0); // Normalize 0-1
+          .expandDims(0).toFloat().div(255.0); // Keep .div(255) for Float32 Detector
 
       const detectorCpuData = await detectorInputGPU.data();
       const detectorInput = tf.tensor(detectorCpuData, [1, 320, 320, 3], 'float32');
@@ -123,13 +133,11 @@ export const useFishNet = () => {
             const w  = data[offset + 2];
             const h  = data[offset + 3];
             
-            // Scale Fix (Normalized output)
-            const scale = 1.0; 
             bestBox = [
-               Math.max(0, (cy - h/2) / scale),
-               Math.max(0, (cx - w/2) / scale),
-               Math.min(1, (cy + h/2) / scale),
-               Math.min(1, (cx + w/2) / scale)
+               Math.max(0, (cy - h/2)),
+               Math.max(0, (cx - w/2)),
+               Math.min(1, (cy + h/2)),
+               Math.min(1, (cx + w/2))
             ];
           }
         }
@@ -137,7 +145,7 @@ export const useFishNet = () => {
       setFishCount(Math.min(detectedCount, 50));
       if (!bestBox) bestBox = [0.1, 0.1, 0.9, 0.9]; 
 
-      // 2. HYDRA (Float32)
+      // --- STEP 2: HYDRA ---
       const hydraBase = imgTensor.expandDims(0).toFloat().div(255.0);
       const croppedGPU = tf.image.cropAndResize(hydraBase, [bestBox], [0], [224, 224]);
       const hydraCpuData = await croppedGPU.data();
@@ -158,74 +166,36 @@ export const useFishNet = () => {
           else if (typeof hydraRaw === 'object' && !hydraRaw.dataSync) outputArray = Object.values(hydraRaw);
           else outputArray = [hydraRaw];
 
-          const head0 = outputArray[0].dataSync(); // Species
-          const head1 = outputArray[1].dataSync(); // Freshness
-          const head2 = outputArray[2].dataSync(); // Disease
+          const head0 = outputArray[0].dataSync(); 
+          const head1 = outputArray[1].dataSync(); 
+          const head2 = outputArray[2].dataSync(); 
 
           outputArray.forEach(t => t.dispose());
           hydraInput.dispose();
 
-          // --- 🧠 SMART SELECTION LOGIC V3 ---
-          
-          // 1. Rank predictions
-          const predictions = Array.from(head0).map((p: any, i) => ({
-              index: i,
-              label: SPECIES_LABELS[i],
-              score: p
-          }));
-          predictions.sort((a: any, b: any) => b.score - a.score);
-
-          let finalChoice = predictions[0];
-          
-          // 2. "Anti-Coward" Filter
-          // If the model picks Background, but a real fish is in 2nd place (>5%), take the real fish.
-          if (finalChoice.label === 'wild_fish_background') {
-              const runnerUp = predictions[1];
-              const thirdPlace = predictions[2];
-
-              if (runnerUp.score > 0.05) {
-                  if (DEBUG_MODE) console.log(`🔄 Override: Swapped Background for '${runnerUp.label}'`);
-                  finalChoice = runnerUp;
-              }
-              // Special check for Crustaceans (often 3rd place)
-              else if (thirdPlace.score > 0.05 && ['prawn', 'crab'].includes(thirdPlace.label)) {
-                   if (DEBUG_MODE) console.log(`🔄 Deep Override: Rescued '${thirdPlace.label}' from 3rd place`);
-                   finalChoice = thirdPlace;
-              }
-          }
-
-          // 3. "Catla/Sea Bass" Confusion Fix
-          // If Sea Bass is < 50% confident, and Catla/Rohu is nearby, swap to Carp.
-          if (finalChoice.label === 'sea_bass' && finalChoice.score < 0.50) {
-               const carp = predictions.find(p => ['catla', 'rohu', 'mrigal'].includes(p.label));
-               if (carp && carp.score > 0.05) {
-                   if (DEBUG_MODE) console.log("🔄 Correction: Low conf Sea Bass -> Swapped to Carp");
-                   finalChoice = carp;
-               }
-          }
-
-          const speciesIdx = finalChoice.index;
-          const speciesName = finalChoice.label;
-
+          const speciesIdx = head0.indexOf(Math.max(...head0));
           const diseaseIdx = head2.indexOf(Math.max(...head2));
-          const diseaseName = DISEASE_LABELS[diseaseIdx] || "unknown";
 
-          if (DEBUG_MODE) console.log("🏆 Winner:", speciesName);
+          const speciesName = SPECIES_LABELS[speciesIdx] || "unknown";
+          const diseaseName = DISEASE_LABELS[diseaseIdx] || "unknown";
+          
+          if (DEBUG_MODE) console.log("� Winner:", speciesName);
 
           return {
-            species: { name: speciesName, confidence: finalChoice.score * 100 },
+            species: { name: speciesName, confidence: head0[speciesIdx] * 100 },
             freshness: { score: head1[0], label: head1[0] > 0.5 ? 'Fresh' : 'Stale' },
             disease: { name: diseaseName, hasDisease: diseaseIdx !== 1, confidence: head2[diseaseIdx] * 100 },
             boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] }
           };
 
       } catch (hydraError) {
+          console.warn("⚠️ Hydra Failed:", hydraError);
           return { ...FALLBACK_RESULT, boundingBox: { yMin: bestBox[0], xMin: bestBox[1], yMax: bestBox[2], xMax: bestBox[3] } };
       }
     } catch (e) {
       return FALLBACK_RESULT;
     }
-  }, [detectorModel, hydraModel]);
+  }, []);
 
   return { isModelLoading, modelError, analyzeFish, fishCount };
 };

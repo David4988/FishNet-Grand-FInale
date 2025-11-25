@@ -19,22 +19,17 @@ export interface FishAnalysis {
     hasDisease: boolean;
     confidence: number;
   };
-  // The Real Detection Box (Normalized 0-1)
   boundingBox?: BoundingBox;
 }
 
-// Extended Interface for the "Pro" Dashboard UI
+// ✅ THIS INTERFACE MUST BE EXPORTED FOR ANALYZEPAGE TO WORK
 export interface UIResult extends FishAnalysis {
   estimatedWeight: number;
   estimatedCount: number;
-  
-  // Rich Data Fields
   marketPrice: number;
   marketTrend: number;
   waterTemp: number;
   phLevel: number;
-  
-  // Biometrics
   autoLength: number;
   manualLength?: string | number;
 }
